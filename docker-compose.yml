@@ -1,0 +1,53 @@
+services:
+  db-depositos-usd:
+    image: postgres:16-alpine
+    container_name: db-depositos-usd
+    environment:
+      POSTGRES_USER: deposit_usd
+      POSTGRES_PASSWORD: deposit_usd
+      POSTGRES_DB: depositos_usd
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata-depositos:/var/lib/postgresql/data
+    networks: [wallet-network]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deposit_usd -d depositos_usd"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ms-depositos-usd:
+    build: ./backend
+    container_name: ms-depositos-usd
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgres://deposit_usd:deposit_usd@db-depositos-usd:5432/depositos_usd
+      CUSTOMER_SERVICE_URL: http://ms-clientes:3002
+      BALANCE_SERVICE_URL: http://ms-saldos:3003
+      USE_FAKES: "true"
+      HTTP_TIMEOUT_MS: 3000
+      FX_API_KEY: ${FX_API_KEY:-}
+      FX_TTL_MIN: 60
+      FX_TIMEOUT_MS: 5000
+    ports:
+      - "3001:3001"
+    depends_on:
+      db-depositos-usd:
+        condition: service_healthy
+    networks: [wallet-network]
+
+  web:
+    build: ./frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - ms-depositos-usd
+    networks: [wallet-network]
+
+volumes:
+  pgdata-depositos:
+
+networks:
+  wallet-network:
+    name: wallet-network
