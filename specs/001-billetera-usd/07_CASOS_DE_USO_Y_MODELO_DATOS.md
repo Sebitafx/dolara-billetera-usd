@@ -395,3 +395,121 @@ stateDiagram-v2
 | **RF-8** (Tasa de Cambio Referencial) | `CU-04` | `backend/src/fx.ts`, `routes/fx.ts` | `fx.test.ts`, `api.test.ts (fx_tasa, fx_convertir)` |
 | **RF-9 .. RF-12** (Operaciones de Billetera DOLARA) | `CU-02`, `CU-03` | `routes/billetera.ts`, `backend/src/money.ts` | `billetera.test.ts`, `money.test.ts` |
 | **RF-13** (Acceso Demo, Búsqueda de Usuarios) | `CU-00`, `CU-03` | `routes/billetera.ts` (`/registro`, `/login`, `/usuarios/buscar`) | `billetera.test.ts`, pruebas E2E SPA |
+
+---
+
+## 6. Justificación Tecnológica Exhaustiva: Stack, Porqués y Casos de Aplicación
+
+Para garantizar que el software sea robusto, mantenible, seguro y de alto rendimiento en un entorno financiero distribuido, cada tecnología del stack fue seleccionada bajo criterios estrictos de ingeniería.
+
+### 6.1 Desglose de Tecnologías, Justificación y Casos de Uso
+
+#### 1. Node.js 24 LTS & TypeScript 5 (Modo Estricto)
+* **¿Por qué se eligió?**:
+  - **I/O Asíncrono no bloqueante**: Manejo eficiente de alta concurrencia mediante el Event Loop de V8, ideal para microservicios que coordinan peticiones concurrentes a bases de datos y APIs externas.
+  - **Soporte Nativo ESM (`"type": "module"`)**: Importaciones y exportaciones estándar de JavaScript sin intermediarios.
+  - **Seguridad de Tipos Rigurosa**: TypeScript en modo estricto (`strict: true`, `noImplicitAny: true`, `strictNullChecks: true`) erradica clases enteras de errores en tiempo de compilación (como `undefined is not a function` o asignaciones erróneas de tipos monetarios).
+* **Alternativas evaluadas**: Java/Spring Boot (mayor consumo de RAM >300MB y tiempo de arranque lento), Python/FastAPI (menor throughput en I/O concurrente sin soporte de tipado estricto en tiempo de compilación nativo).
+* **Casos de aplicación**:
+  - Modelado de dominio puro (`MoneyUsd`, `Deposit`, `EstadoDeposito`).
+  - Definición de contratos e interfaces de puertos (`CustomerAccountPort`, `BalancePort`).
+  - Orquestación de llamadas asíncronas con temporizadores de cancelación (timeouts).
+
+#### 2. Express 4.21 vs. NestJS (Decisión de Diseño de Framework)
+* **¿Por qué se eligió Express y se descartó NestJS?**:
+  - **Descarte de NestJS**: NestJS introduce un costo cognitivo y de ejecución elevado: decorators pesados basados en `reflect-metadata`, contenedor de inyección de dependencias rígido y tiempos de arranque lentos (>2-3s). Para un microservicio independiente con Arquitectura Hexagonal, las clases de NestJS acoplan la lógica del dominio al framework.
+  - **Ventajas de Express**: Huella de memoria mínima (<40MB RAM), arranque instantáneo (<100ms) y máxima flexibilidad para estructurar puertos y adaptadores sin dependencias invasivas.
+* **Casos de aplicación**:
+  - Exposición de endpoints REST bajo el prefijo `/api/v1/*`.
+  - Middlewares de infraestructura: inyección y propagación de `X-Correlation-Id`, parseo de JSON y captura centralizada de errores (Error Handling Middleware).
+
+#### 3. PostgreSQL 16+ & Driver Nativo `pg` vs. ORMs (Prisma / TypeORM)
+* **¿Por qué se eligió PostgreSQL y `pg` nativo?**:
+  - **Precisión Monetaria Nativa**: PostgreSQL soporta de forma nativa `NUMERIC(18,2)`, garantizando almacenamiento exacto sin pérdida de dígitos.
+  - **Garantías ACID y Control Transaccional**: Capacidad para ejecutar bloqueos pesimistas a nivel de fila (`SELECT ... FOR UPDATE`) con aislamiento estricto.
+  - **Reglas de Integridad en el Motor**: Restricciones `CHECK (balance >= 0)`, `CHECK (moneda = 'USD')` y llaves únicas `UNIQUE (idempotency_key)`.
+  - **¿Por qué `pg` directo y no un ORM?**: Los ORMs tradicionales (Prisma, TypeORM) abstraen las consultas SQL dificultando el control fino de bloqueos ordenados anti-deadlock (`ORDER BY id FOR UPDATE`) y agregando sobrecarga de hidratación de modelos. `pg` permite consultas SQL explícitas, parametrizadas e inmunes a SQL Injection.
+* **Casos de aplicación**:
+  - Transacciones atómicas de transferencia entre billeteras con `BEGIN ... COMMIT ... ROLLBACK`.
+  - Inserciones inmutables en `billetera_movimientos` y auditoría de recargas en `depositos_usd`.
+  - Almacenamiento en caché de tasas de cambio en `fx_rates`.
+
+#### 4. Zod 3.23 (Validación de Esquemas en el Borde / Fail-Fast)
+* **¿Por qué se eligió?**:
+  - Permite definir esquemas de validación en tiempo de ejecución (runtime) que automáticamente infieren los tipos estáticos de TypeScript (`z.infer<typeof schema>`).
+  - Principio **Fail-Fast**: Si un cliente envía un monto negativo, un string malformado o una moneda que no sea `"USD"` (por ejemplo `"PEN"`), Zod aborta la petición en milisegundos con error 400 sin consumir conexiones de base de datos ni consultar servicios externos.
+* **Casos de aplicación**:
+  - `montoSchema`: Valida que el monto sea una cadena decimal válida mayor a cero y con hasta 2 decimales (`/^\d+(\.\d{1,2})?$/`).
+  - `aliasSchema`: Valida formato de alias en minúsculas de 3 a 30 caracteres.
+  - `pinSchema`: Valida PIN numérico exacto de 4 a 6 dígitos.
+  - `monedaUsdSchema`: Rechaza cualquier valor diferente a `"USD"`.
+
+#### 5. Aritmética Exacta en Centavos (`money.ts` / Cero Floats)
+* **¿Por qué se diseñó?**:
+  - El estándar binario IEEE-754 de punto flotante en JavaScript introduce imprecisiones matemáticas inadmisibles en software financiero (ej. `0.1 + 0.2 = 0.30000000000000004`).
+  - Solución canónica: Convertir todo valor monetario a **centavos enteros** (`toCents("150.50") = 15050`), realizar las operaciones con aritmética entera (`add`, `sub`, `gte`) y formatear de vuelta a string con dos decimales.
+* **Casos de aplicación**:
+  - Suma de saldos al acreditar depósitos o recargas.
+  - Resta y validación de fondos suficientes (`gte`) en retiros y transferencias.
+  - Conversión de divisas con algoritmo de redondeo comercial Half-Up (`Math.floor(x + 0.5)`).
+
+#### 6. Criptografía Nativa (`node:crypto`)
+* **¿Por qué se eligió?**:
+  - Módulo nativo del motor Node.js respaldado por OpenSSL, sin dependencias externas en `node_modules` que incrementen la superficie de ataque.
+* **Casos de aplicación**:
+  - Generación de identificadores únicos universales (`randomUUID()`).
+  - Generación de huellas digitales de idempotencia (`createHash('sha256')`).
+  - Hash seguro de credenciales demo (`sha256('dolara-demo:' + pin)`).
+
+#### 7. OpenAPI 3.x & Swagger UI (`swagger-ui-express` + `swagger-jsdoc`)
+* **¿Por qué se eligió?**:
+  - Estándar internacional para contratos de API REST. Permite documentar los endpoints directamente en el código mediante anotaciones JSDoc, manteniendo el contrato sincronizado con la implementación.
+* **Casos de aplicación**:
+  - Exposición de la documentación interactiva en `GET /docs`.
+  - Permite al equipo de frontend, evaluadores y otros microservicios probar las rutas con cabeceras `Idempotency-Key` y verificar los códigos de respuesta (201, 400, 401, 404, 409, 422, 503).
+
+#### 8. Vitest 2.1 & Supertest
+* **¿Por qué se eligió?**:
+  - Vitest ofrece tiempos de arranque hasta 10 veces más rápidos que Jest gracias a la compilación nativa de Vite/ESBuild y soporte directo de módulos ES.
+* **Casos de aplicación**:
+  - Pruebas unitarias de dominio y lógica matemática (`money.test.ts`, `deposit.test.ts`).
+  - Pruebas de casos de uso con adaptadores en memoria (mocks de `CustomerAccountPort` y `BalancePort`).
+  - Pruebas de integración E2E con Supertest contra la base de datos PostgreSQL real.
+  - Pruebas de concurrencia e idempotencia con múltiples peticiones simultáneas.
+
+#### 9. Angular 18+ (SPA DOLARA) con Standalone Components & Signals
+* **¿Por qué se eligió?**:
+  - Framework robusto y estructurado para aplicaciones bancarias.
+  - **Standalone Components**: Eliminan la complejidad de `NgModules` y reducen el tamaño del bundle.
+  - **Signals**: Reactividad granular de alto rendimiento para actualizar saldo y movimientos sin re-renderizar componentes innecesarios.
+  - **Router Guards (`authGuard`)**: Protección de rutas sin sesión de usuario demo.
+* **Casos de aplicación**:
+  - 6 pantallas de banca móvil y escritorio (Acceso, Inicio/Dashboard, Operaciones, Transferencias con autocompletado, Depósitos con voucher, Historial e Información FX).
+
+#### 10. Nginx & Docker Compose (Red `wallet-network`)
+* **¿Por qué se eligió?**:
+  - **Nginx**: Servidor web ultraligero que entrega los estáticos de Angular y actúa como reverse proxy hacia la API (`/api` hacia `ms-depositos-usd:3001`), evitando problemas de CORS.
+  - **Docker Compose**: Aislamiento y reproducibilidad en cualquier máquina mediante la red puente `wallet-network`.
+* **Casos de aplicación**:
+  - Despliegue integral con un solo comando: `docker compose up -d --build`.
+  - Conexión segura entre contenedores (`ms-depositos-usd`, `db-depositos-usd`, `web`) y preparación para interactuar con los contenedores `ms-clientes` y `ms-saldos`.
+
+#### 11. RabbitMQ + Patrón Transactional Outbox (Diseño Listo para Integración)
+* **¿Por qué se reservó este diseño?**:
+  - En sistemas distribuidos, la publicación directa de eventos hacia un broker de mensajería puede provocar inconsistencias (ej. la base de datos confirma el depósito pero la red cae antes de publicar el evento, o viceversa).
+  - El patrón **Transactional Outbox** resuelve esto guardando el evento en una tabla local dentro de la misma transacción de PostgreSQL, asegurando entrega atómica (*At-Least-Once Delivery*).
+* **Casos de aplicación**:
+  - Emisión del evento `deposit.usd.completed.v1` para que otros servicios consuman la novedad (notificaciones por correo, analítica, auditoría externa).
+
+---
+
+### 6.2 Registro de Decisiones de Arquitectura (ADRs Resumidos)
+
+| ADR | Decisión Tomada | Justificación Principal | Alternativa Descartada |
+|-----|-----------------|--------------------------|------------------------|
+| **ADR-01** | Usar **Express** en vez de **NestJS** | Menor latencia, menor consumo de memoria (<40MB vs >150MB) y desacoplamiento limpio de la Arquitectura Hexagonal. | NestJS (descartado por sobrecarga de decoradores y DI acoplado). |
+| **ADR-02** | Usar **SQL Nativo con `pg`** en vez de ORM | Control explícito de bloqueos pesimistas ordenados (`SELECT FOR UPDATE`) para prevenir deadlocks en transferencias. | Prisma / TypeORM (descartados por complejidad en locks y sobrecarga de hidratación). |
+| **ADR-03** | Aritmética en **Centavos Enteros (`money.ts`)** | Elimina al 100% errores de redondeo de punto flotante IEEE-754 en JavaScript. | `Number` / `parseFloat` (descartados por riesgo de descuadre financiero). |
+| **ADR-04** | Puertos y Adaptadores (Hexagonal) | Permite trabajar con adaptadores falsos (*fakes*) en Etapa A y pasar a HTTP real en Etapas B/C sin modificar el caso de uso. | Acoplamiento directo a URLs HTTP de Clientes/Saldos. |
+| **ADR-05** | Hashing **SHA-256** para Idempotencia | Detecta colisiones de clave con payloads distintos devolviendo `409 Conflict`, y permite replay seguro `200 OK`. | Validación simple de clave sin verificación de contenido. |
+

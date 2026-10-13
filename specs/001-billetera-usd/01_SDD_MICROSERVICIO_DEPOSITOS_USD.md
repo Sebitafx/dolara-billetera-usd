@@ -6,12 +6,12 @@
 **Versión del documento:** 1.0.0  
 **Estado:** Propuesto para implementación  
 **Arquitectura:** Microservicios + Arquitectura Hexagonal / Clean Architecture  
-**Lenguaje:** TypeScript  
+**Lenguaje:** TypeScript 5 (modo estricto)  
 **Runtime:** Node.js 24 LTS  
-**Framework:** NestJS  
-**Base de datos:** PostgreSQL 16+  
-**Contenedorización:** Docker / Docker Compose  
-**Contrato:** REST/JSON + OpenAPI 3.x (ultima versión) 
+**Framework:** Express 4.x (Arquitectura Hexagonal / Puertos y Adaptadores; NestJS descartado por sobrecarga, ver plan.md §8)  
+**Base de datos:** PostgreSQL 16+ (driver pg nativo, transacciones ACID con SELECT FOR UPDATE)  
+**Contenedorización:** Docker / Docker Compose (red wallet-network)  
+**Contrato:** REST/JSON + OpenAPI 3.x (/docs vía Swagger UI) 
 **Integración asíncrona opcional:** RabbitMQ mediante patrón Outbox
 
 ---
