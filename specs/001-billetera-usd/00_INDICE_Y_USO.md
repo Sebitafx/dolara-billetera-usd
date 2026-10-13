@@ -19,18 +19,23 @@ Esta carpeta contiene la especificación de **DOLARA — billetera 100% en dóla
 5. **`05_INTEGRACION_DESPLIEGUE_Y_OPERACION.md`**
    Docker, red compartida, Gateway, CI/CD, integración con PEN/Retiros y operación.
 
-6. **`06_ARQUITECTURA_Y_FLUJOS.md`** ← empieza aquí si tienes 5 min
+6. **`06_ARQUITECTURA_Y_FLUJOS.md`**
    Mapa visual: contenedores, hexagonal, BD, 4 flujos de dinero, errores, pantallas SPA y trazabilidad RF→código→tests.
 
-7. **`spec.md` (v2), `plan.md`, `tasks.md`**
+7. **`07_CASOS_DE_USO_Y_MODELO_DATOS.md`**
+   Casos de usuario formales (BDD Gherkin), diagrama ERD completo con restricciones, diagramas de estados/secuencia y estándares de ingeniería (precisión monetaria, idempotencia RFC, seguridad).
+
+8. **`spec.md` (v2), `plan.md`, `tasks.md`**
    QUÉ/POR QUÉ, CÓMO y desglose verificable DOLARA USD-only con changelog v1→v2.
 
-> **Nota Plan A:** `SDD_COMPLETO_MICROSERVICIO_DEPOSITOS_USD.md` es histórico v1 congelado (no editar, no usar para implementar). Fuente vigente: `spec.md v2 + 06_ARQUITECTURA_Y_FLUJOS.md`.
+> **Nota Plan A:** `SDD_COMPLETO_MICROSERVICIO_DEPOSITOS_USD.md` es histórico v1 congelado (no editar, no usar para implementar). Fuente vigente: `spec.md v2 + 06_ARQUITECTURA_Y_FLUJOS.md + 07_CASOS_DE_USO_Y_MODELO_DATOS.md`.
 
 ## Orden recomendado de lectura
 
 ```text
 06 visual (5 min)
+  ↓
+07 Casos de Usuario y Modelo de Datos (ERD + Estándares)
   ↓
 spec.md v2 (qué)
   ↓

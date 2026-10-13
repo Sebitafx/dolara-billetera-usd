@@ -88,46 +88,69 @@ flowchart TB
 
 ## 4. Base de datos: 5 tablas, 2 dominios separados
 
+> Detalle canónico de tablas, restricciones, índices y casos de prueba en [07_CASOS_DE_USO_Y_MODELO_DATOS.md](file:///d:/BilleteraDigital_Dolar/specs/001-billetera-usd/07_CASOS_DE_USO_Y_MODELO_DATOS.md).
+
 ```mermaid
 erDiagram
   depositos_usd ||--o{ fake_ledger : "referencia=deposito_id (solo fake)"
   wallets ||--o{ billetera_movimientos : "FK wallet_id"
   depositos_usd {
-    uuid id PK
-    text cliente_id
-    numeric monto "18,2 >0"
-    char moneda "CHECK=USD"
-    text estado "PEND/VAL/COMP/FALL"
-    text idempotency_key "UNIQUE"
-    text payload_hash "para 409"
+    uuid id PK "gen_random_uuid"
+    text cliente_id "cliente en MS Clientes"
+    text cuenta_destino_id "cuenta externa"
+    numeric monto "NUMERIC(18,2) > 0"
+    char moneda "CHECK='USD'"
+    text metodo_origen "EFECTIVO|TRANSFERENCIA|TARJETA|OTRO"
+    text referencia_externa "comprobante"
+    text idempotency_key UK "UNIQUE"
+    text payload_hash "SHA-256 para 409"
+    text estado "PENDIENTE|VALIDADO|COMPLETADO|FALLIDO"
+    text movimiento_saldo_id "confirmación MS Saldos"
+    text failure_code "código fallo auditable"
+    text failure_detail "detalle técnico"
+    timestamptz creado_en "now()"
+    timestamptz actualizado_en "now()"
+    timestamptz completado_en "fecha abono"
   }
   wallets {
-    uuid id PK
-    text user_id "UNIQUE"
-    numeric balance ">=0"
-    char moneda "CHECK=USD v2"
+    uuid id PK "gen_random_uuid"
+    text user_id UK "UNIQUE alias"
+    text nombre "nombre visible v3"
+    text pin_hash "SHA-256 v3"
+    numeric balance "NUMERIC(18,2) >= 0"
+    char moneda "CHECK='USD'"
+    timestamptz creado_en "now()"
   }
   billetera_movimientos {
-    uuid id PK
-    uuid wallet_id FK
-    text tipo "dep/ret/in/out"
-    numeric monto ">0"
-    char moneda "CHECK=USD v2"
-    numeric saldo_resultante
-    uuid referencia "parea in/out"
-    text idempotency_key "UNIQUE"
+    uuid id PK "gen_random_uuid"
+    uuid wallet_id FK "REFERENCES wallets(id)"
+    text tipo "deposito|retiro|transfer_in|transfer_out"
+    numeric monto "NUMERIC(18,2) > 0"
+    char moneda "CHECK='USD'"
+    numeric saldo_resultante "NUMERIC(18,2)"
+    uuid referencia "ID común transfer_in/out"
+    text idempotency_key UK "UNIQUE"
+    timestamptz creado_en "now()"
+  }
+  fake_ledger {
+    text referencia PK "deposito_id"
+    text cliente_id "cliente"
+    numeric monto "NUMERIC(18,2) > 0"
+    timestamptz creado_en "now()"
   }
   fx_rates {
-    text par "PK=USD_PEN"
-    numeric tasa "12,6"
+    text par PK "PK=USD_PEN"
+    numeric tasa "NUMERIC(12,6) > 0"
+    text fuente "fuente de tasa"
+    timestamptz fetched_at "now()"
   }
 ```
 
 ```
-depositos_usd  = recargas auditadas (externo)  · moneda USD CHECK
-wallets        = saldo propio DOLARA           · moneda USD CHECK (v2)
+depositos_usd  = recargas auditadas (externo)  · moneda USD CHECK (aislado de wallets)
+wallets        = saldo propio DOLARA           · moneda USD CHECK (v2/v3)
 billetera_mov  = movimientos inmutables        · solo INSERT, jamás UPDATE/DELETE
-fx_rates       = caché tasa                    · 1 fila USD_PEN
+fx_rates       = caché tasa                    · 1 fila USD_PEN (exchangerate.host)
 fake_ledger    = idempotencia fake             · se desecha en Etapa B/C
 ```
 
