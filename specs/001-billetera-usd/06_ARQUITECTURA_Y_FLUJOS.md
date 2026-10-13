@@ -190,7 +190,8 @@ sequenceDiagram
 GET /fx/tasa?par=USD_PEN → {tasa, stale:false|true}  (caché 60min, fallback última, 503 sin tasa)
 POST /fx/convertir {monto,de,a} → USD→PEN | PEN→USD half-up · USD→USD eco · PEN→PEN 400 (v2)
 ```
-
+También tener como referencia data de otros sistemas
+puesto que este módulo se integrará a otros más que son clientes, billetera en soles, etc.
 ---
 
 ## 6. Errores y códigos (C10)

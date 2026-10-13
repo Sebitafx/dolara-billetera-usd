@@ -242,6 +242,8 @@ Antes de integrar:
 - Sin secretos en Git.
 - Swagger actualizado.
 - Docker build exitoso.
+- Subir código al repositorio con una minima de 80% de
+  coveragertura aceptable
 
 No se requiere perseguir un porcentaje de cobertura arbitrario; priorizar cobertura de reglas monetarias, estados, idempotencia y errores.
 

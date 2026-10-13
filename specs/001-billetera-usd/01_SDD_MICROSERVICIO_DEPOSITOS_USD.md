@@ -11,7 +11,7 @@
 **Framework:** NestJS  
 **Base de datos:** PostgreSQL 16+  
 **Contenedorización:** Docker / Docker Compose  
-**Contrato:** REST/JSON + OpenAPI 3.x  
+**Contrato:** REST/JSON + OpenAPI 3.x (ultima versión) 
 **Integración asíncrona opcional:** RabbitMQ mediante patrón Outbox
 
 ---
