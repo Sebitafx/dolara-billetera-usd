@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-depositos-usd
+  namespace: default
+  labels:
+    app: ms-depositos-usd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-depositos-usd
+  template:
+    metadata:
+      labels:
+        app: ms-depositos-usd
+    spec:
+      containers:
+        - name: ms-depositos-usd
+          image: dolara-backend:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: dolara-config
+            - secretRef:
+                name: dolara-secret
+          ports:
+            - containerPort: 3001
+              name: http
+          resources:
+            requests:
+              cpu: 50m
+              memory: 90Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-depositos-usd
+  namespace: default
+  labels:
+    app: ms-depositos-usd
+spec:
+  ports:
+    - port: 3001
+      targetPort: 3001
+      name: http
+  selector:
+    app: ms-depositos-usd

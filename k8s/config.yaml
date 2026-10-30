@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dolara-config
+  namespace: default
+data:
+  PORT: "3001"
+  CUSTOMER_SERVICE_URL: "http://ms-clientes:3002"
+  BALANCE_SERVICE_URL: "http://ms-saldos:3003"
+  USE_FAKES: "true"
+  HTTP_TIMEOUT_MS: "3000"
+  FX_TTL_MIN: "60"
+  FX_TIMEOUT_MS: "5000"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dolara-secret
+  namespace: default
+type: Opaque
+stringData:
+  POSTGRES_USER: "deposit_usd"
+  POSTGRES_PASSWORD: "deposit_usd"
+  POSTGRES_DB: "depositos_usd"
+  DATABASE_URL: "postgres://deposit_usd:deposit_usd@db-depositos-usd:5432/depositos_usd"
+  FX_API_KEY: ""
