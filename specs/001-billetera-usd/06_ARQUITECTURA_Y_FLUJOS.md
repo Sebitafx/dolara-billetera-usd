@@ -1,4 +1,4 @@
-# 06 — Arquitectura y flujos · DOLARA Billetera USD-only (v2)
+# 06 — Arquitectura y flujos · DOLARA Billetera USD-only (v3)
 
 > Lectura en 5 min: qué es, dónde vive cada cosa, cómo fluye el dinero y dónde mirar el código.
 > Detalle canónico en `01`, contratos en `02`, pasos en `03`, pruebas en `04`, despliegue en `05`. Este doc es el **mapa visual**.

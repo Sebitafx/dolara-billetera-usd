@@ -1,4 +1,4 @@
-# 💵 DOLARA — Tu billetera en dólares
+﻿# 💵 DOLARA — Tu billetera en dólares
 
 ![DOLARA](https://img.shields.io/badge/DOLARA-v3-f59e0b?style=for-the-badge&logo=dollar&logoColor=white)
 ![USD-only](https://img.shields.io/badge/moneda-USD--only-16a34a?style=for-the-badge)
@@ -57,8 +57,10 @@ flowchart LR
   API --> FX[💱 exchangerate.host<br/>caché 60 min]
 ```
 
+* **Sandbox MCP para Agentes (Fase M):** Servidor MCP sidecar (@modelcontextprotocol/sdk) para integración autónoma entre equipos. Ver [onboarding-equipos.md](specs/002-mcp-dolara/contracts/onboarding-equipos.md).
 * **Hexagonal (C9):** `usecases/create-deposit.ts` solo habla con `CustomerAccountPort` / `BalancePort`; `USE_FAKES=false` conecta los MS reales sin tocar el caso de uso.
 * **UML completo:** [`docs/arquitectura.puml`](docs/arquitectura.puml) (contenedores + componentes hexagonales — ábrelo con la extensión PlantUML de VS Code o en plantuml.com).
+* **Diagramas en imagen (`docs/*.png` + fuente `.svg` editable):** arquitectura (2 niveles) · arquitectura por capas · módulos por RF · estados del depósito · tablas BD (ER + versión simple) · flujo general.
 * **Mapa visual 5 min:** [`specs/001-billetera-usd/06_ARQUITECTURA_Y_FLUJOS.md`](specs/001-billetera-usd/06_ARQUITECTURA_Y_FLUJOS.md).
 
 ---

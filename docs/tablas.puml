@@ -1,0 +1,72 @@
+' DOLARA — Modelo de datos ER (v3) · PlantUML
+' Verlo: extensión PlantUML en VS Code o https://www.plantuml.com/plantuml/uml/
+' Realidad honesta: 1 FK física + 1 relación lógica + 1 tabla aislada (C11)
+
+@startuml Tablas
+!theme plain
+title DOLARA v3 — Tablas (1 FK física · C11 sin FKs cruzadas)
+
+entity "depositos_usd\n(recargas auditadas)" as dep {
+  * id : UUID <<PK>>
+  --
+  * cliente_id : TEXT
+  * monto : NUMERIC(18,2)
+  * moneda : CHAR(3) <<CHECK USD>>
+  * idempotency_key : TEXT <<UQ>>
+  * estado : PEND/VAL/COMP/FALL
+  movimiento_saldo_id : TEXT
+  failure_code / detail
+  creado · actualizado · completado
+}
+
+entity "fake_ledger\n(solo Etapa A)" as leg {
+  * referencia : TEXT <<PK>>
+  --
+  * cliente_id : TEXT
+  * monto : NUMERIC(18,2)
+}
+
+entity "wallets\n(saldo propio)" as wal {
+  * id : UUID <<PK>>
+  --
+  * user_id : TEXT <<UQ>>
+  nombre : TEXT
+  pin_hash : TEXT
+  * balance : NUMERIC(18,2)
+  * moneda : CHAR(3) <<CHECK USD>>
+}
+
+entity "billetera_movimientos\n(solo INSERT)" as mov {
+  * id : UUID <<PK>>
+  --
+  * wallet_id : UUID <<FK>>
+  * tipo : dep/ret/in/out
+  * monto : NUMERIC(18,2)
+  * moneda : CHAR(3) <<CHECK USD>>
+  saldo_resultante : NUMERIC
+  referencia : UUID
+  idempotency_key : TEXT <<UQ>>
+}
+
+entity "fx_rates\n(caché, aislada)" as fx {
+  * par : TEXT <<PK>>
+  --
+  * tasa : NUMERIC(12,6)
+  fuente + fetched_at
+}
+
+' ÚNICA FK física del sistema
+wal ||--o{ mov : "1 — N\nwallet_id"
+' Relación LÓGICA (sin constraint): el ledger referencia al depósito por valor
+dep ||..o| leg : "referencia =\ndeposito_id\n(lógica, sin FK)"
+
+note bottom of leg
+  Temporal: se desecha
+  en Etapa B/C (Saldos real)
+end note
+
+note bottom of fx
+  Sin relaciones:
+  solo lectura display
+end note
+@enduml

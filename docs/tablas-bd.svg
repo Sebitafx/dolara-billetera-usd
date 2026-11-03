@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="860" viewBox="0 0 1320 860" font-family="'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <marker id="d1" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#1e9e5a"/></marker>
+    <marker id="d2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#2b6cb0"/></marker>
+  </defs>
+  <rect x="0" y="0" width="1320" height="860" fill="#ffffff"/>
+  <text x="60" y="52" font-size="26" font-weight="700" fill="#1a202c">Modelo de datos — Postgres 16 <tspan font-size="15" font-weight="400" fill="#64748b">(2 dominios sin FKs cruzadas · C11)</tspan></text>
+
+  <!-- ===== depositos_usd ===== -->
+  <g>
+    <rect x="60" y="80" width="350" height="430" rx="12" fill="#f4f8fd" stroke="#2b6cb0" stroke-width="2.5"/>
+    <rect x="60" y="80" width="350" height="54" rx="12" fill="#2b6cb0"/>
+    <rect x="60" y="110" width="350" height="24" fill="#2b6cb0"/>
+    <text x="84" y="114" font-size="18" font-weight="700" fill="#ffffff">depositos_usd</text>
+    <text x="300" y="114" font-size="12" fill="#dbeafe">vouchers</text>
+    <g font-size="13.5" fill="#1a365d">
+      <text x="84" y="162">id UUID</text><rect x="330" y="148" width="52" height="19" rx="9" fill="#f59e0b"/><text x="356" y="162" font-size="11" font-weight="800" text-anchor="middle" fill="#1c1005">PK</text>
+      <text x="84" y="190">cliente_id (= tu alias)</text>
+      <text x="84" y="218">monto NUMERIC(18,2) &gt; 0</text>
+      <text x="84" y="246">moneda = 'USD' ★</text>
+      <text x="84" y="274">metodo_origen ENUM</text>
+      <text x="84" y="302">idempotency_key</text><rect x="330" y="288" width="52" height="19" rx="9" fill="#7c3aed"/><text x="356" y="302" font-size="11" font-weight="800" text-anchor="middle" fill="#ffffff">UQ</text>
+      <text x="84" y="330">payload_hash (409)</text>
+      <text x="84" y="358">estado PEND/VAL/COMP/FALL</text>
+      <text x="84" y="386">movimiento_saldo_id</text>
+      <text x="84" y="414">failure_code / detail</text>
+      <text x="84" y="442">creado · actualizado · completado</text>
+      <text x="84" y="470">idx cliente+fecha · estado</text>
+    </g>
+  </g>
+
+  <!-- ===== wallets ===== -->
+  <g>
+    <rect x="485" y="80" width="350" height="320" rx="12" fill="#eef9f1" stroke="#1e9e5a" stroke-width="2.5"/>
+    <rect x="485" y="80" width="350" height="54" rx="12" fill="#1e9e5a"/>
+    <rect x="485" y="110" width="350" height="24" fill="#1e9e5a"/>
+    <text x="509" y="114" font-size="18" font-weight="700" fill="#ffffff">wallets</text>
+    <text x="725" y="114" font-size="12" fill="#d1fae5">saldo propio</text>
+    <g font-size="13.5" fill="#0f5132">
+      <text x="509" y="162">id UUID</text><rect x="755" y="148" width="52" height="19" rx="9" fill="#f59e0b"/><text x="781" y="162" font-size="11" font-weight="800" text-anchor="middle" fill="#1c1005">PK</text>
+      <text x="509" y="190">user_id (alias)</text><rect x="755" y="176" width="52" height="19" rx="9" fill="#7c3aed"/><text x="781" y="190" font-size="11" font-weight="800" text-anchor="middle" fill="#ffffff">UQ</text>
+      <text x="509" y="218">nombre (v3)</text>
+      <text x="509" y="246">pin_hash SHA-256 (v3)</text>
+      <text x="509" y="274">balance NUMERIC(18,2) ≥ 0</text>
+      <text x="509" y="302">moneda = 'USD' ★ (v2)</text>
+      <text x="509" y="330">creado_en</text>
+      <text x="509" y="362"> </text>
+    </g>
+  </g>
+
+  <!-- ===== billetera_movimientos ===== -->
+  <g>
+    <rect x="910" y="80" width="350" height="376" rx="12" fill="#eef9f1" stroke="#1e9e5a" stroke-width="2.5"/>
+    <rect x="910" y="80" width="350" height="54" rx="12" fill="#1e9e5a"/>
+    <rect x="910" y="110" width="350" height="24" fill="#1e9e5a"/>
+    <text x="934" y="114" font-size="18" font-weight="700" fill="#ffffff">billetera_movimientos</text>
+    <text x="934" y="130" font-size="0" fill="#ffffff">.</text>
+    <g font-size="13.5" fill="#0f5132">
+      <text x="934" y="162">id UUID</text><rect x="1180" y="148" width="52" height="19" rx="9" fill="#f59e0b"/><text x="1206" y="162" font-size="11" font-weight="800" text-anchor="middle" fill="#1c1005">PK</text>
+      <text x="934" y="190">wallet_id → wallets</text><rect x="1180" y="176" width="52" height="19" rx="9" fill="#1d4ed8"/><text x="1206" y="190" font-size="11" font-weight="800" text-anchor="middle" fill="#ffffff">FK</text>
+      <text x="934" y="218">tipo dep / ret / in / out</text>
+      <text x="934" y="246">monto NUMERIC(18,2) &gt; 0</text>
+      <text x="934" y="274">moneda = 'USD' ★ (v2)</text>
+      <text x="934" y="302">saldo_resultante</text>
+      <text x="934" y="330">referencia (parea in/out)</text>
+      <text x="934" y="358">idempotency_key</text><rect x="1180" y="344" width="52" height="19" rx="9" fill="#7c3aed"/><text x="1206" y="358" font-size="11" font-weight="800" text-anchor="middle" fill="#ffffff">UQ</text>
+      <text x="934" y="386">creado_en · idx wallet+fecha</text>
+      <text x="934" y="414">solo INSERT, jamás UPDATE (C2)</text>
+    </g>
+  </g>
+
+  <!-- ===== fx_rates ===== -->
+  <g>
+    <rect x="485" y="430" width="350" height="190" rx="12" fill="#fff8e6" stroke="#b7791f" stroke-width="2.5"/>
+    <rect x="485" y="430" width="350" height="54" rx="12" fill="#b7791f"/>
+    <rect x="485" y="460" width="350" height="24" fill="#b7791f"/>
+    <text x="509" y="464" font-size="18" font-weight="700" fill="#ffffff">fx_rates</text>
+    <text x="725" y="464" font-size="12" fill="#fef3c7">caché</text>
+    <g font-size="13.5" fill="#713f12">
+      <text x="509" y="512">par (= USD_PEN)</text><rect x="755" y="498" width="52" height="19" rx="9" fill="#f59e0b"/><text x="781" y="512" font-size="11" font-weight="800" text-anchor="middle" fill="#1c1005">PK</text>
+      <text x="509" y="540">tasa NUMERIC(12,6) &gt; 0</text>
+      <text x="509" y="568">fuente + fetched_at</text>
+      <text x="509" y="596">TTL 60 min + stale · aislada</text>
+    </g>
+  </g>
+
+  <!-- ===== fake_ledger ===== -->
+  <g>
+    <rect x="60" y="540" width="350" height="190" rx="12" fill="#f8fafc" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="10 5"/>
+    <text x="84" y="574" font-size="18" font-weight="700" fill="#475569">fake_ledger · Etapa A</text>
+    <g font-size="13.5" fill="#475569">
+      <text x="84" y="604">referencia (= deposito_id)</text><rect x="330" y="590" width="52" height="19" rx="9" fill="#f59e0b"/><text x="356" y="604" font-size="11" font-weight="800" text-anchor="middle" fill="#1c1005">PK</text>
+      <text x="84" y="632">cliente_id · monto</text>
+      <text x="84" y="660">idempotente lado saldo</text>
+      <text x="84" y="688">se desecha en Etapa B/C</text>
+    </g>
+  </g>
+
+  <!-- ===== CONEXIONES ===== -->
+  <line x1="835" y1="240" x2="902" y2="240" stroke="#1e9e5a" stroke-width="4" marker-end="url(#d1)"/>
+  <path d="M892,228 L904,240 L892,252" fill="none" stroke="#1e9e5a" stroke-width="3"/>
+  <path d="M884,228 L896,240 L884,252" fill="none" stroke="#1e9e5a" stroke-width="3"/>
+  <rect x="762" y="196" width="66" height="24" rx="12" fill="#1e9e5a"/><text x="795" y="213" font-size="13" font-weight="800" text-anchor="middle" fill="#ffffff">1 — N</text>
+
+  <line x1="235" y1="510" x2="235" y2="532" stroke="#2b6cb0" stroke-width="4" marker-end="url(#d2)"/>
+  <rect x="248" y="512" width="170" height="24" rx="12" fill="#2b6cb0"/><text x="333" y="529" font-size="12" font-weight="700" text-anchor="middle" fill="#ffffff">ref = deposito_id · 1—1</text>
+
+  <!-- Leyenda -->
+  <rect x="910" y="486" width="350" height="134" rx="12" fill="#f2f5fa" stroke="#b9c6dd" stroke-width="2"/>
+  <text x="934" y="518" font-size="17" font-weight="700" fill="#1a202c">Leyenda</text>
+  <text x="934" y="544" font-size="13.5" fill="#1a202c">★ CHECK USD-only · PK / FK / UQ</text>
+  <text x="934" y="568" font-size="13.5" fill="#1a202c">⟶ pata de gallo = lado N · 1—N / 1—1</text>
+  <text x="934" y="592" font-size="13.5" fill="#1a202c">Sin FKs cruzadas entre dominios (C11)</text>
+
+  <text x="60" y="780" font-size="14" fill="#64748b">Verde = saldo propio · Azul = auditado · Ámbar = FX · Gris punteado = temporal · migraciones v1+v2+v3 en backend/src/db.ts</text>
+  <text x="60" y="806" font-size="14" fill="#64748b"> </text>
+</svg>

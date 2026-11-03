@@ -1,0 +1,112 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "DOLARA — Billetera en Dólares API (USD-only)",
+    "version": "2.0.0",
+    "description": "API canónica del microservicio Billetera USD y Depósitos USD. Incluye endpoints de operación financiera, consulta FX y Sandbox de integración para agentes de IA."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001",
+      "description": "Entorno de Desarrollo / Sandbox Local"
+    }
+  ],
+  "paths": {
+    "/api/v1/sandbox/reset": {
+      "post": {
+        "summary": "Reinicia los datos de prueba del Sandbox (Fase S)",
+        "description": "Limpia transacciones demo y billeteras con prefijo de prueba para permitir suites reproducibles entre agentes. Bloqueado en producción."
+      }
+    },
+    "/api/v1/sandbox/scenarios": {
+      "get": {
+        "summary": "Lista los escenarios de simulación disponibles para pruebas de integración de agentes (Fase S)"
+      }
+    },
+    "/health/live": {
+      "get": {
+        "summary": "Proceso vivo (RF-7)"
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Listo para operar (RF-7; no exige MS externos)"
+      }
+    },
+    "/api/v1/fx/tasa": {
+      "get": {
+        "summary": "Tasa USD_PEN vigente, aporte propio (RF-8)"
+      }
+    },
+    "/api/v1/fx/convertir": {
+      "post": {
+        "summary": "Conversión referencial USD<->PEN con tasa vigente (RF-8, solo informativo, no acredita)"
+      }
+    },
+    "/api/v1/depositos/usd": {
+      "post": {
+        "summary": "Crea un depósito USD (RF-1)"
+      },
+      "get": {
+        "summary": "Historial paginado por cliente (RF-6)"
+      }
+    },
+    "/api/v1/depositos/usd/{id}": {
+      "get": {
+        "summary": "Consulta un depósito por id (RF-6)"
+      }
+    },
+    "/api/v1/billetera/wallets": {
+      "post": {
+        "summary": "Crea billetera USD (RF-9, DOLARA v2 USD-only)"
+      }
+    },
+    "/api/v1/billetera/registro": {
+      "post": {
+        "summary": "Registro demo DOLARA — alias + nombre + PIN (RF-13)"
+      }
+    },
+    "/api/v1/billetera/login": {
+      "post": {
+        "summary": "Login demo DOLARA — alias + PIN (RF-13)"
+      }
+    },
+    "/api/v1/billetera/usuarios/buscar": {
+      "get": {
+        "summary": "Busca usuarios por alias para transferir sin pegar UUIDs (RF-13)"
+      }
+    },
+    "/api/v1/billetera/wallets/by-user/{userId}": {
+      "get": {
+        "summary": "Busca billetera USD por user_id (DOLARA UX, RF-9)"
+      }
+    },
+    "/api/v1/billetera/wallets/{id}": {
+      "get": {
+        "summary": "Saldo de billetera USD (RF-9)"
+      }
+    },
+    "/api/v1/billetera/wallets/{id}/depositos": {
+      "post": {
+        "summary": "Deposita en billetera local (RF-10)"
+      }
+    },
+    "/api/v1/billetera/wallets/{id}/retiros": {
+      "post": {
+        "summary": "Retira de billetera local (RF-10)"
+      }
+    },
+    "/api/v1/billetera/transferencias": {
+      "post": {
+        "summary": "Transfiere entre billeteras locales, atómica e idempotente (RF-11)"
+      }
+    },
+    "/api/v1/billetera/wallets/{id}/movimientos": {
+      "get": {
+        "summary": "Historial USD paginado (RF-12)"
+      }
+    }
+  },
+  "components": {},
+  "tags": []
+}

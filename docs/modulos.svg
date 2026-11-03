@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="1040" viewBox="0 0 1320 1040" font-family="'Segoe UI', system-ui, sans-serif">
+  <rect x="0" y="0" width="1320" height="1040" fill="#ffffff"/>
+  <text x="60" y="52" font-size="26" font-weight="700" fill="#1a202c">Módulos por requisitos <tspan font-size="15" font-weight="400" fill="#64748b">(cada módulo = un grupo de RF de spec.md §5)</tspan></text>
+
+  <!-- M1 Depósitos -->
+  <g>
+    <rect x="40" y="76" width="620" height="330" rx="12" fill="#fff8e6" stroke="#b7791f" stroke-width="3"/>
+    <text x="64" y="112" font-size="19" font-weight="700" fill="#713f12">💵 M1 · Depósitos auditados ⭐</text>
+    <rect x="64" y="124" width="52" height="22" rx="11" fill="#b7791f"/><text x="90" y="140" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-1</text>
+    <rect x="122" y="124" width="52" height="22" rx="11" fill="#b7791f"/><text x="148" y="140" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-2</text>
+    <rect x="180" y="124" width="52" height="22" rx="11" fill="#b7791f"/><text x="206" y="140" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-3</text>
+    <rect x="238" y="124" width="52" height="22" rx="11" fill="#b7791f"/><text x="264" y="140" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-4</text>
+    <rect x="296" y="124" width="52" height="22" rx="11" fill="#b7791f"/><text x="322" y="140" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-5</text>
+    <rect x="354" y="124" width="52" height="22" rx="11" fill="#b7791f"/><text x="380" y="140" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-6</text>
+    <text x="64" y="168" font-size="13.5" fill="#713f12">HU-1 depositar · HU-2 validaciones · HU-3 consultar (spec.md §4)</text>
+    <text x="64" y="192" font-size="13" fill="#713f12" font-family="Consolas, monospace">POST+GET /api/v1/depositos/usd · Idempotency-Key</text>
+    <text x="64" y="216" font-size="13.5" fill="#713f12">usecases/ + domain/ + ports/ + adapters/ — único hexagonal (C9)</text>
+    <text x="64" y="240" font-size="13.5" fill="#713f12">Tablas: depositos_usd + fake_ledger (Etapa A)</text>
+    <text x="64" y="264" font-size="13.5" fill="#713f12">Pantallas: /depositar (voucher+puente) · /historial (recargas)</text>
+    <text x="64" y="288" font-size="13.5" fill="#713f12">Tests: usecase UC-01..06 · api E2E/replay/409/negativas</text>
+    <text x="64" y="316" font-size="13.5" fill="#713f12">⭐ Núcleo de la clase · tasks T1–T8 · suite api+usecase</text>
+    <text x="64" y="344" font-size="13.5" fill="#713f12"> </text>
+    <text x="64" y="372" font-size="13.5" fill="#713f12"> </text>
+  </g>
+
+  <!-- M2 Billetera -->
+  <g>
+    <rect x="680" y="76" width="600" height="330" rx="12" fill="#e2f4e7" stroke="#1e9e5a" stroke-width="3"/>
+    <text x="704" y="112" font-size="19" font-weight="700" fill="#0f5132">👛 M2 · Billetera USD</text>
+    <rect x="704" y="124" width="52" height="22" rx="11" fill="#1e9e5a"/><text x="730" y="140" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-9</text>
+    <rect x="762" y="124" width="62" height="22" rx="11" fill="#1e9e5a"/><text x="793" y="140" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-10</text>
+    <rect x="830" y="124" width="62" height="22" rx="11" fill="#1e9e5a"/><text x="861" y="140" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-11</text>
+    <rect x="898" y="124" width="62" height="22" rx="11" fill="#1e9e5a"/><text x="929" y="140" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-12</text>
+    <text x="704" y="168" font-size="13.5" fill="#0f5132">HU-5 crear/ver · HU-6 abono/retiro · HU-7 transferir</text>
+    <text x="704" y="192" font-size="13" fill="#0f5132" font-family="Consolas, monospace">/billetera/wallets · /transferencias · /movimientos</text>
+    <text x="704" y="216" font-size="13.5" fill="#0f5132">SQL directo transaccional · alias→UUID · 422 atómico</text>
+    <text x="704" y="240" font-size="13.5" fill="#0f5132">Tablas: wallets + billetera_movimientos (1—N)</text>
+    <text x="704" y="264" font-size="13.5" fill="#0f5132">Pantallas: /billetera · /transferir · /inicio · /historial</text>
+    <text x="704" y="288" font-size="13.5" fill="#0f5132">Tests: billetera.test (crud · 422 · replay · historial)</text>
+    <text x="704" y="316" font-size="13.5" fill="#0f5132">Tasks T12–T15 · separado del core por C11</text>
+  </g>
+
+  <!-- M3 Acceso -->
+  <g>
+    <rect x="40" y="426" width="620" height="250" rx="12" fill="#e3edf9" stroke="#2b6cb0" stroke-width="2.5"/>
+    <text x="64" y="462" font-size="19" font-weight="700" fill="#1a365d">🔑 M3 · Acceso y sesión</text>
+    <rect x="64" y="474" width="62" height="22" rx="11" fill="#2b6cb0"/><text x="95" y="490" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-13</text>
+    <text x="136" y="491" font-size="13.5" fill="#1a365d">HU-0 · tasks T19 · S-10</text>
+    <text x="64" y="518" font-size="13" fill="#1a365d" font-family="Consolas, monospace">POST /billetera/registro · /login · GET /usuarios/buscar</text>
+    <text x="64" y="542" font-size="13.5" fill="#1a365d">alias+nombre+PIN (hash) · guard → /acceso</text>
+    <text x="64" y="566" font-size="13.5" fill="#1a365d">Tablas: wallets.nombre + pin_hash (v3)</text>
+    <text x="64" y="590" font-size="13.5" fill="#1a365d">Pantallas: /acceso · shell con usuario · historial propio</text>
+    <text x="64" y="614" font-size="13.5" fill="#1a365d">Sin auth real: JWT real vivirá en Gateway (S-8)</text>
+    <text x="64" y="642" font-size="13.5" fill="#1a365d"> </text>
+  </g>
+
+  <!-- M4 FX -->
+  <g>
+    <rect x="680" y="426" width="600" height="250" rx="12" fill="#fef3c7" stroke="#d97706" stroke-width="2.5"/>
+    <text x="704" y="462" font-size="19" font-weight="700" fill="#92400e">💱 M4 · FX referencial</text>
+    <rect x="704" y="474" width="52" height="22" rx="11" fill="#d97706"/><text x="730" y="490" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-8</text>
+    <text x="762" y="491" font-size="13.5" fill="#92400e">HU-4 · S-7 · aporte propio</text>
+    <text x="704" y="518" font-size="13" fill="#92400e" font-family="Consolas, monospace">GET /fx/tasa · POST /fx/convertir</text>
+    <text x="704" y="542" font-size="13.5" fill="#92400e">Solo display · PEN→PEN = 400 · jamás acredita</text>
+    <text x="704" y="566" font-size="13.5" fill="#92400e">Tabla: fx_rates (TTL 60 min + stale)</text>
+    <text x="704" y="590" font-size="13.5" fill="#92400e">Pantalla: /fx · chip T.C. en dashboard</text>
+    <text x="704" y="614" font-size="13.5" fill="#92400e">Tests: fx.test + api fx_*</text>
+  </g>
+
+  <!-- M5 Plataforma -->
+  <g>
+    <rect x="40" y="696" width="1240" height="250" rx="12" fill="#f2f5fa" stroke="#64748b" stroke-width="2.5"/>
+    <text x="64" y="732" font-size="19" font-weight="700" fill="#1a202c">🧵 M5 · Plataforma transversal (vale para todos)</text>
+    <rect x="64" y="744" width="52" height="22" rx="11" fill="#64748b"/><text x="90" y="760" font-size="12" font-weight="800" text-anchor="middle" fill="#ffffff">RF-7</text>
+    <text x="122" y="761" font-size="13.5" fill="#1a202c">/health/live · /ready · Swagger /docs · RNF-1..7 · C1..C11 · tasks T16–T18</text>
+    <text x="64" y="788" font-size="13.5" fill="#1a202c">money.ts: NUMERIC como texto + add/sub/gte, cero floats (C2) · validators zod con USD-only · errors {code, correlation_id}</text>
+    <text x="64" y="812" font-size="13.5" fill="#1a202c">Idempotency-Key UNIQUE en 2 tablas · migraciones versionadas v1+v2+v3 (C4) · secretos solo en .env (C3)</text>
+    <text x="64" y="836" font-size="13.5" fill="#1a202c">Suite 37/37 = api(11) + billetera(5) + usecase(7) + fx(4) + domain(5) + money(5) · tsc + ng build · docker compose</text>
+    <text x="64" y="860" font-size="13.5" fill="#1a202c">Docs: README · 00 índice · 01–05 SDD · 06 visual · demo.md · 5 diagramas docs/*.png</text>
+    <text x="64" y="888" font-size="13.5" fill="#1a202c">⭐ = núcleo de la clase · cada RF tiene task (tasks.md) y test (C7: sin RF huérfanos)</text>
+    <text x="64" y="912" font-size="13.5" fill="#1a202c"> </text>
+  </g>
+</svg>

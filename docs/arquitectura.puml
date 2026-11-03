@@ -3,7 +3,7 @@
 ' Detalle completo: specs/001-billetera-usd/06_ARQUITECTURA_Y_FLUJOS.md
 
 @startuml Arquitectura
-!theme plain
+!theme plain  
 title DOLARA v3 — Arquitectura (USD-only)
 
 actor "👤 Usuario" as U

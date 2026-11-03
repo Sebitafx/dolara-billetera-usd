@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="800" viewBox="0 0 1320 800" font-family="'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <marker id="u1" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#1e9e5a"/></marker>
+    <marker id="u2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#2b6cb0"/></marker>
+  </defs>
+  <rect x="0" y="0" width="1320" height="800" fill="#ffffff"/>
+  <text x="60" y="54" font-size="26" font-weight="700" fill="#1a202c">¿Dónde se guarda tu plata? <tspan font-size="15" font-weight="400" fill="#64748b">(5 cajitas con nombre y apellido)</tspan></text>
+
+  <!-- Vouchers -->
+  <g>
+    <rect x="60" y="84" width="340" height="330" rx="12" fill="#f4f8fd" stroke="#2b6cb0" stroke-width="2.5"/>
+    <rect x="60" y="84" width="340" height="56" rx="12" fill="#2b6cb0"/>
+    <rect x="60" y="114" width="340" height="26" fill="#2b6cb0"/>
+    <text x="84" y="119" font-size="19" font-weight="700" fill="#ffffff">🧾 Boletas de recarga</text>
+    <text x="84" y="162" font-size="13.5" fill="#1a365d" font-style="italic">Como la boleta de tu depósito</text>
+    <text x="84" y="192" font-size="14" fill="#1a365d">• ¿De quién? → tu alias</text>
+    <text x="84" y="220" font-size="14" fill="#1a365d">• ¿Cuánto? → ej. $150.50</text>
+    <text x="84" y="248" font-size="14" fill="#1a365d">• ¿En qué va? → pendiente,</text>
+    <text x="84" y="270" font-size="14" fill="#1a365d">  validado, completado…</text>
+    <text x="84" y="298" font-size="14" fill="#1a365d">• Comprobante del banco</text>
+    <text x="84" y="326" font-size="14" fill="#1a365d">• Si algo falla, guarda el porqué</text>
+    <text x="84" y="360" font-size="14" fill="#1a365d">• Siempre en dólares, nunca soles</text>
+    <text x="84" y="388" font-size="14" fill="#1a365d"> </text>
+  </g>
+
+  <!-- Personas -->
+  <g>
+    <rect x="470" y="84" width="340" height="330" rx="12" fill="#eef9f1" stroke="#1e9e5a" stroke-width="2.5"/>
+    <rect x="470" y="84" width="340" height="56" rx="12" fill="#1e9e5a"/>
+    <rect x="470" y="114" width="340" height="26" fill="#1e9e5a"/>
+    <text x="494" y="119" font-size="19" font-weight="700" fill="#ffffff">👛 Personas y su saldo</text>
+    <text x="494" y="162" font-size="13.5" fill="#0f5132" font-style="italic">Como tu cuenta del banco</text>
+    <text x="494" y="192" font-size="14" fill="#0f5132">• Alias único → ej. @monito</text>
+    <text x="494" y="220" font-size="14" fill="#0f5132">• Nombre para saludarte</text>
+    <text x="494" y="248" font-size="14" fill="#0f5132">• Clave (PIN) bien guardada</text>
+    <text x="494" y="276" font-size="14" fill="#0f5132">• Saldo actual → ej. $80.00</text>
+    <text x="494" y="304" font-size="14" fill="#0f5132">• Nunca en negativo</text>
+    <text x="494" y="332" font-size="14" fill="#0f5132">• Siempre en dólares</text>
+  </g>
+
+  <!-- Movimientos -->
+  <g>
+    <rect x="880" y="84" width="380" height="330" rx="12" fill="#eef9f1" stroke="#1e9e5a" stroke-width="2.5"/>
+    <rect x="880" y="84" width="380" height="56" rx="12" fill="#1e9e5a"/>
+    <rect x="880" y="114" width="380" height="26" fill="#1e9e5a"/>
+    <text x="904" y="119" font-size="19" font-weight="700" fill="#ffffff">📒 Extracto de movimientos</text>
+    <text x="904" y="162" font-size="13.5" fill="#0f5132" font-style="italic">Como tu estado de cuenta: no se borra</text>
+    <text x="904" y="192" font-size="14" fill="#0f5132">• ¿Qué pasó? → recarga, retiro…</text>
+    <text x="904" y="220" font-size="14" fill="#0f5132">• ¿Cuánto se movió?</text>
+    <text x="904" y="248" font-size="14" fill="#0f5132">• ¿Cuánto quedó después?</text>
+    <text x="904" y="276" font-size="14" fill="#0f5132">• Si fue envío, ¿a quién?</text>
+    <text x="904" y="304" font-size="14" fill="#0f5132">• Cada envío genera 2 líneas:</text>
+    <text x="904" y="326" font-size="14" fill="#0f5132">  la que sale y la que llega</text>
+    <text x="904" y="358" font-size="14" fill="#0f5132"> </text>
+  </g>
+
+  <!-- Tasa -->
+  <g>
+    <rect x="470" y="450" width="340" height="200" rx="12" fill="#fff8e6" stroke="#b7791f" stroke-width="2.5"/>
+    <text x="494" y="486" font-size="19" font-weight="700" fill="#92400e">💱 Pizarra del dólar</text>
+    <text x="494" y="512" font-size="13.5" fill="#92400e" font-style="italic">Como la pizarra de la casa de cambio</text>
+    <text x="494" y="542" font-size="14" fill="#92400e">• Un solo número: S/ 3.42…</text>
+    <text x="494" y="570" font-size="14" fill="#92400e">• Se actualiza cada hora</text>
+    <text x="494" y="598" font-size="14" fill="#92400e">• Solo para mostrar, no mueve plata</text>
+    <text x="494" y="626" font-size="14" fill="#92400e"> </text>
+  </g>
+
+  <!-- Ledger -->
+  <g>
+    <rect x="60" y="450" width="340" height="200" rx="12" fill="#f8fafc" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="10 5"/>
+    <text x="84" y="486" font-size="19" font-weight="700" fill="#475569">🎭 Libro de mentira</text>
+    <text x="84" y="512" font-size="13.5" fill="#475569" font-style="italic">Utilería de la obra (temporal)</text>
+    <text x="84" y="542" font-size="14" fill="#475569">• Finge ser el banco real</text>
+    <text x="84" y="570" font-size="14" fill="#475569">• Anota cada abono una vez</text>
+    <text x="84" y="598" font-size="14" fill="#475569">• Desaparece al integrar</text>
+  </g>
+
+  <!-- Conexiones grandes -->
+  <line x1="810" y1="250" x2="872" y2="250" stroke="#1e9e5a" stroke-width="5" marker-end="url(#u1)"/>
+  <path d="M858,236 L876,250 L858,264" fill="none" stroke="#1e9e5a" stroke-width="4"/>
+  <rect x="726" y="206" width="150" height="28" rx="14" fill="#1e9e5a"/><text x="801" y="225" font-size="14" font-weight="800" text-anchor="middle" fill="#ffffff">1 persona → N movs</text>
+
+  <line x1="230" y1="414" x2="230" y2="442" stroke="#2b6cb0" stroke-width="5" marker-end="url(#u2)"/>
+  <rect x="248" y="414" width="200" height="28" rx="14" fill="#2b6cb0"/><text x="348" y="433" font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">cada boleta ↔ su apunte</text>
+
+  <!-- Leyenda -->
+  <rect x="880" y="450" width="380" height="200" rx="12" fill="#f2f5fa" stroke="#b9c6dd" stroke-width="2"/>
+  <text x="904" y="486" font-size="18" font-weight="700" fill="#1a202c">Cómo leerlo</text>
+  <text x="904" y="514" font-size="14" fill="#1a202c">💵 Boleta + 🎭 apunte = la recarga</text>
+  <text x="904" y="536" font-size="14" fill="#1a202c">con comprobante (auditada).</text>
+  <text x="904" y="564" font-size="14" fill="#1a202c">👛 Persona + 📒 extracto = tu</text>
+  <text x="904" y="586" font-size="14" fill="#1a202c">saldo y su historia (billetera).</text>
+  <text x="904" y="614" font-size="14" fill="#1a202c">💱 Pizarra vive sola: solo mira.</text>
+</svg>

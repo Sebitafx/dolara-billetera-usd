@@ -1,4 +1,4 @@
-# SPEC 001 v2 — DOLARA · Billetera en Dólares (USD-only)
+# SPEC 001 v3 — DOLARA · Billetera en Dólares (USD-only)
 
 > Estado: `spec` = QUÉ y POR QUÉ (el CÓMO vive en `plan.md` + `06_ARQUITECTURA_Y_FLUJOS.md`).
 > v2 DOLARA (2026-10-09): refactorización masiva a billetera 100% en dólares. Marca frontend **DOLARA**, backend USD-only estricto, aritmética exacta en `money.ts` en todos los flujos.
@@ -16,11 +16,22 @@
 | Marca | Swagger `DOLARA v2`, SPA `DOLARA — Tu billetera en dólares`, `lang es-PE` | `index.ts`, `frontend/src` |
 | Frontend banca móvil | Dashboard saldo + bottom-nav 5 tabs + movimientos + formato `Intl USD` | `frontend/src/app` |
 
+## Changelog v2 → v3
+
+| Cambio | Detalle | Código |
+|--------|---------|--------|
+| Acceso demo + sesión | Registro/login alias+nombre+PIN (hash SHA-256), guard SPA, cada usuario ve solo lo suyo | `routes/billetera.ts /registro /login`, `auth.service.ts`, `auth.guard.ts`, `/acceso` |
+| Transferencia por alias | `origen_id/destino_id` aceptan UUID o alias + `GET /usuarios/buscar` con autocompletado | `resolverWalletId`, `transferir.component.ts` |
+| Fakes por usuario | Todo `user_id` registrado en `wallets` es cliente USD activo; B/C reservados intactos | `adapters/fakes.ts` |
+| Migración v3 | `wallets.nombre` + `wallets.pin_hash` (idempotente) | `backend/src/db.ts` |
+| Desktop full-width | Sidebar + grid 2 col ≥960px, tabbar solo móvil, formularios centrados | `styles.css`, `app.component.ts` |
+| Recarga auditada ↔ billetera | Puente explícito voucher → saldo (dominios separados C11) | `depositar.component.ts` |
+
 ---
 
 ## 1. Contexto del problema
 
-La clase construye un sistema de pagos por microservicios (Clientes, Depósitos PEN/USD, Retiros PEN/USD, Saldos/Ledger, Gateway). A este equipo le toca **Depósitos USD**: aceptar depósitos solo en dólares, validar cliente/cuenta contra el MS de Clientes, evitar duplicados por idempotencia, pedir el abono al dueño del saldo y exponer trazabilidad completa. Mientras los otros equipos terminan, se desarrolla con fakes tras puertos (C9).
+La clase construye un sistema de pagos por microservicios (Clientes, Depósitos PEN/USD, Retiros PEN/USD, Saldos/Ledger, Gateway). A este equipo le toca **Billetera USD** (equipo billetera USD, constitution): saldo propio en dólares, transferencias, acceso demo y FX referencial. El MS **Depósitos USD es de otro grupo** y aún no publica contrato: se consume vía **fake funcional** tras puertos (C9) para probar el comportamiento completo de billetera de punta a punta; al llegar su API solo cambiará el adaptador, nunca nuestro código (ver plan Fase 1 de separación y `docs/demo.md`).
 
 ## 2. Supuestos de dominio (fuente explícita)
 

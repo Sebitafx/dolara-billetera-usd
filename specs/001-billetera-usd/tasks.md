@@ -1,4 +1,4 @@
-# TASKS 001 v2 — DOLARA Billetera USD-only (verificable)
+# TASKS 001 v3 — DOLARA Billetera USD-only (verificable)
 
 > Reglas: referencia `RF-*` · orden estricto, no saltar sin test verde (C6) · `[x]` solo con evidencia.
 > v2 2026-10-09: T12–T15 completadas + blindaje USD-only + frontend DOLARA banca móvil.
