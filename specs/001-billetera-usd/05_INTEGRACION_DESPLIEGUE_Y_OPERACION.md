@@ -93,7 +93,7 @@ Los puertos son convenciones y pueden cambiar si la clase ya definió otros.
 | Depósitos PEN | 3004 |
 | Retiros USD | 3005 |
 | Retiros PEN | 3006 |
-| PostgreSQL Depósitos USD host | 5433 |
+| PostgreSQL Depósitos USD host | 5434 |
 
 Los puertos internos deben quedar documentados y libres de colisiones.
 

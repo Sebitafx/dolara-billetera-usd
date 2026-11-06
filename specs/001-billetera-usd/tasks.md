@@ -1,7 +1,7 @@
 # TASKS 001 v3 — DOLARA Billetera USD-only (verificable)
 
 > Reglas: referencia `RF-*` · orden estricto, no saltar sin test verde (C6) · `[x]` solo con evidencia.
-> v2 2026-10-09: T12–T15 completadas + blindaje USD-only + frontend DOLARA banca móvil.
+> v2 2026-10-09: T12–T15 completadas + blindaje USD-only + frontend Billetera Digital USD banca móvil.
 
 > Reglas: referencia `RF-*` · orden estricto, no saltar sin test verde (C6) · `[x]` solo con evidencia.
 
@@ -68,19 +68,19 @@
 - [x] **T14** Transferencia USD atómica + idempotencia `RF-11, HU-7`
   - Aceptación: A=100,B=0,monto=30 → A=70,B=30 par in/out `moneda USD`; replay sin 2º débito; sin fondos → `422` nada cambia; sin key → `400`
   - Test: `tests/billetera.test.ts :: transferencia_201 + replay + transferencia_422`
-- [x] **T15** Historial USD + SPA DOLARA billetera + demo `RF-12`
+- [x] **T15** Historial USD + SPA Billetera Digital USD billetera + demo `RF-12`
   - Aceptación: historial paginado desc con `moneda:"USD"`; SPA `/billetera /transferir /inicio` opera contra `:3001`; `docs/demo.md` ampliado
   - Test: `tests/billetera.test.ts :: historial_paginado` + `ng build production OK`
 
 ---
 
-## Fase G — Blindaje USD-only + DOLARA banca móvil (v2, 2026-10-09)
+## Fase G — Blindaje USD-only + Billetera Digital USD banca móvil (v2, 2026-10-09)
 
 - [x] **T16** Blindaje USD-only estricto `RF-1, RF-2, RF-8, RF-10`
   - Aceptación: `{moneda:"PEN"}` en depósito → `400`; `POST /fx/convertir PEN→PEN` → `400`; `wallets/billetera_movimientos` con CHECK USD; grep `Number(balance)` en `billetera.ts` = 0
   - Test: manual `curl` + `tsc --noEmit OK` + unit `money/domain 10/10`
-- [x] **T17** Frontend DOLARA estilo banca móvil (BCP-like, identidad propia) `HU-5…HU-7, RNF-1`
-  - Aceptación: marca DOLARA + `es-PE` + bottom-nav 5 tabs + hero saldo + quick-grid + `Intl USD` + `ng build OK` (311kB main)
+- [x] **T17** Frontend Billetera Digital USD estilo banca móvil (BCP-like, identidad propia) `HU-5…HU-7, RNF-1`
+  - Aceptación: marca Billetera Digital USD + `es-PE` + bottom-nav 5 tabs + hero saldo + quick-grid + `Intl USD` + `ng build OK` (311kB main)
   - Test: build prod + navegación `/inicio /billetera /transferir /depositar /historial /fx`
 - [x] **T18** Docs arquitectura visual + flujos `C5, C7`
   - Aceptación: `06_ARQUITECTURA_Y_FLUJOS.md` con diagramas + 4 flujos + esquema BD + matriz RF↔tests; `00_INDICE` actualizado
@@ -107,7 +107,7 @@
 | T6–T8 | RF-1..RF-6 | usecase UC-*, api.test E2E/negativas |
 | T9 | RF-8 | fx.test, api.test fx_* |
 | T10–T11 | todos | suite + demo |
-| T12–T15 | RF-9..RF-12 | billetera.test + SPA DOLARA + demo |
+| T12–T15 | RF-9..RF-12 | billetera.test + SPA Billetera Digital USD + demo |
 | T16 | RF-1, RF-2, RF-8, RF-10 | tsc + unit + curl PEN→400 |
 | T17 | HU-5…HU-7, RNF-1 | ng build + navegación 6 rutas |
 | T18 | (C5, C7) | 06_ARQUITECTURA_Y_FLUJOS.md |

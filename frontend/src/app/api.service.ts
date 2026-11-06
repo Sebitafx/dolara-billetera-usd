@@ -1,58 +1,17 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import {
+  ConversionResult,
+  Deposito,
+  ExchangeRate,
+  Historial,
+  TransferResult,
+  Wallet,
+  WalletHistory,
+  WalletOperationResult,
+} from './api-contract';
 
-export interface Deposito {
-  deposito_id: string;
-  cliente_id: string;
-  cuenta_destino_id?: string | null;
-  monto: string;
-  moneda: 'USD';
-  estado: string;
-  movimiento_saldo_id?: string | null;
-  creado_en: string;
-  completado_en?: string | null;
-}
-
-export interface Historial {
-  items: Deposito[];
-  page: number;
-  limit: number;
-  total: number;
-}
-
-export interface ApiErrorBody {
-  status: number;
-  code: string;
-  message: string;
-  correlation_id: string;
-  timestamp: string;
-}
-
-export interface Wallet {
-  id: string;
-  user_id: string;
-  nombre: string | null;
-  balance: string;
-  moneda: 'USD';
-}
-
-export interface WalletMov {
-  id: string;
-  tipo: 'deposito' | 'retiro' | 'transfer_in' | 'transfer_out';
-  monto: string;
-  moneda: 'USD';
-  saldo_resultante: string;
-  referencia: string | null;
-  creado_en: string;
-}
-
-export interface WalletHistorial {
-  items: WalletMov[];
-  page: number;
-  limit: number;
-  total: number;
-  moneda: 'USD';
-}
+export type { ApiErrorBody, Deposito, Historial, Wallet, WalletMovement as WalletMov, WalletHistory as WalletHistorial } from './api-contract';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -73,7 +32,7 @@ export class ApiService {
     return this.http.get<Historial>(`${this.base}/depositos/usd`, { params: { cliente_id, page, limit } });
   }
 
-  // ---- Billetera USD (saldo propio, corazón de DOLARA) ----
+  // ---- Billetera Digital USD (saldo propio) ----
   registro(cmd: { user_id: string; nombre: string; pin: string }) {
     return this.http.post<Wallet>(`${this.base}/billetera/registro`, cmd);
   }
@@ -98,18 +57,18 @@ export class ApiService {
   }
 
   billeteraPorUsuario(user_id: string) {
-    return this.http.get<Wallet>(`${this.base}/billetera/wallets/by-user/${encodeURIComponent(user_id)}`);
+    return this.http.get<Wallet>(`${this.base}/billetera/usuarios/${encodeURIComponent(user_id)}/wallet`);
   }
 
   depositarBilletera(id: string, monto: string) {
-    return this.http.post<{ movimiento_id: string; balance: string; moneda: 'USD' }>(
+    return this.http.post<WalletOperationResult>(
       `${this.base}/billetera/wallets/${id}/depositos`,
       { monto },
     );
   }
 
   retirarBilletera(id: string, monto: string) {
-    return this.http.post<{ movimiento_id: string; balance: string; moneda: 'USD' }>(
+    return this.http.post<WalletOperationResult>(
       `${this.base}/billetera/wallets/${id}/retiros`,
       { monto },
     );
@@ -117,7 +76,7 @@ export class ApiService {
 
   transferir(origen_id: string, destino_id: string, monto: string) {
     const headers = new HttpHeaders({ 'Idempotency-Key': crypto.randomUUID() });
-    return this.http.post<{ referencia: string; origen_balance: string; destino_balance: string; moneda: 'USD'; replay: boolean }>(
+    return this.http.post<TransferResult>(
       `${this.base}/billetera/transferencias`,
       { origen_id, destino_id, monto },
       { headers },
@@ -125,21 +84,21 @@ export class ApiService {
   }
 
   movimientosBilletera(id: string, page = 1, limit = 20) {
-    return this.http.get<WalletHistorial>(`${this.base}/billetera/wallets/${id}/movimientos`, {
+    return this.http.get<WalletHistory>(`${this.base}/billetera/wallets/${id}/movimientos`, {
       params: { page, limit },
     });
   }
 
   // ---- FX referencial (no acredita, solo informativo) ----
-  tasa() {
-    return this.http.get<{ par: string; tasa: string; fuente: string; actualizada_en: string; stale: boolean }>(
+  tasa(par: 'USD_PEN' | 'PEN_USD' = 'USD_PEN') {
+    return this.http.get<ExchangeRate>(
       `${this.base}/fx/tasa`,
-      { params: { par: 'USD_PEN' } },
+      { params: { par } },
     );
   }
 
   convertir(monto: string, de: 'USD' | 'PEN', a: 'USD' | 'PEN') {
-    return this.http.post<{ monto_origen: string; monto_convertido: string; tasa: string }>(`${this.base}/fx/convertir`, {
+    return this.http.post<ConversionResult>(`${this.base}/fx/convertir`, {
       monto,
       de,
       a,

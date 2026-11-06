@@ -1,4 +1,4 @@
-name: CI/CD Pipeline - DOLARA Kubernetes EC2
+name: CI/CD Pipeline - Billetera Digital USD Kubernetes EC2
 
 on:
   push:
@@ -68,6 +68,6 @@ jobs:
           script: |
             set -e
             echo "Conectado al servidor EC2: $(uname -a)"
-            cd /home/ec2-user/dolara-billetera-usd
+            cd /home/ec2-user/billetera-digital-usd
             chmod +x scripts/deploy.sh
             bash scripts/deploy.sh

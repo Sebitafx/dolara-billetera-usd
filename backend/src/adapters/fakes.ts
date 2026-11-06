@@ -13,10 +13,10 @@ export class FakeCustomerAccountAdapter implements CustomerAccountPort {
     if (id === 'cliente-pen' || id === 'C') {
       return { customerExists: true, customerStatus: 'ACTIVE', accountStatus: 'ACTIVE', enabledCurrencies: ['PEN'] };
     }
-    if (id === 'cliente-activo' || id === 'A' || id.startsWith('u-') || id.startsWith('test-')) {
+    if (id === 'cliente-activo' || id === 'A' || id.startsWith('u-') || id.startsWith('test-') || id.startsWith('sandbox-')) {
       return { customerExists: true, customerStatus: 'ACTIVE', accountStatus: 'ACTIVE', enabledCurrencies: ['USD'] };
     }
-    // Demo DOLARA: todo user_id registrado en wallets es cliente USD activo.
+    // Demo Billetera Digital USD: todo user_id registrado en wallets es cliente USD activo.
     // Así cada usuario logueado deposita con su propio cliente_id y ve solo su historial.
     try {
       const { rows } = await pool.query(`SELECT 1 FROM wallets WHERE user_id = $1 LIMIT 1`, [id]);

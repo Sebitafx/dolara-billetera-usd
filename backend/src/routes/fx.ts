@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { obtenerTasa } from '../fx.js';
-import { convertir } from '../money.js';
+import { convertir, tasaInversa } from '../money.js';
 import { apiError } from '../errors.js';
 import { convertirSchema } from '../validators.js';
 
@@ -15,8 +15,11 @@ export const fx = Router();
 fx.get('/tasa', async (req, res, next) => {
   try {
     const par = String(req.query.par ?? 'USD_PEN');
-    if (par !== 'USD_PEN') return next(apiError(400, 'VALIDATION_ERROR', 'solo se soporta USD_PEN en v1'));
-    res.json(await obtenerTasa());
+    if (par !== 'USD_PEN' && par !== 'PEN_USD') {
+      return next(apiError(400, 'VALIDATION_ERROR', 'par debe ser USD_PEN o PEN_USD'));
+    }
+    const quote = await obtenerTasa();
+    res.json(par === 'USD_PEN' ? quote : { ...quote, par, tasa: tasaInversa(quote.tasa) });
   } catch (e) {
     next(e);
   }
@@ -32,17 +35,27 @@ fx.post('/convertir', async (req, res, next) => {
   try {
     const { monto, de, a } = convertirSchema.parse(req.body);
     if (de === a) {
-      // USD-only estricto: solo se permite eco USD->USD. PEN->PEN se rechaza.
-      if (de !== 'USD') return next(apiError(400, 'VALIDATION_ERROR', 'billetera USD-only: solo se permite USD->USD como eco'));
-      return res.json({ monto_origen: monto, moneda_origen: de, monto_convertido: monto, moneda_destino: a, tasa: '1.000000' });
+      return res.json({
+        monto_origen: monto,
+        moneda_origen: de,
+        monto_convertido: monto,
+        moneda_destino: a,
+        tasa: '1.000000',
+        par: `${de}_${a}`,
+      });
     }
     const t = await obtenerTasa();
+    const invertir = de === 'PEN';
     res.json({
       monto_origen: monto,
       moneda_origen: de,
-      monto_convertido: convertir(monto, t.tasa, de === 'PEN'),
+      monto_convertido: convertir(monto, t.tasa, invertir),
       moneda_destino: a,
-      tasa: t.tasa,
+      tasa: invertir ? tasaInversa(t.tasa) : t.tasa,
+      par: `${de}_${a}`,
+      fuente: t.fuente,
+      actualizada_en: t.actualizada_en,
+      stale: t.stale,
     });
   } catch (e) {
     if (e instanceof Error && e.name === 'ZodError') return next(apiError(400, 'VALIDATION_ERROR', 'cuerpo inválido'));

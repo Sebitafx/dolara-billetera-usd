@@ -1,112 +1,2343 @@
 {
-  "openapi": "3.0.0",
+  "openapi": "3.0.3",
   "info": {
-    "title": "DOLARA — Billetera en Dólares API (USD-only)",
-    "version": "2.0.0",
-    "description": "API canónica del microservicio Billetera USD y Depósitos USD. Incluye endpoints de operación financiera, consulta FX y Sandbox de integración para agentes de IA."
+    "title": "Billetera Digital USD API",
+    "version": "1.2.0",
+    "description": "Contrato REST de **Billetera Digital USD**.\nPermite crear depósitos, operar billeteras, transferir fondos y consultar tasas FX.\n\n### Convenciones\n- Todos los montos se representan como **strings decimales** (`\"150.50\"`) — sin floats.\n- Todas las billeteras operan exclusivamente en **USD**.\n- Los endpoints idempotentes requieren **`Idempotency-Key`** como UUID v4.\n- Toda respuesta incluye `X-Correlation-Id`; los errores usan siempre `ApiError`.\n- `GET /health/ready` conserva su respuesta operacional `ReadyResponse` incluso cuando devuelve 503.\n- Las conversiones USD/PEN son referenciales y usan una cotización externa de ExchangeRate-API.\n\n### Seguridad objetivo (propuesta para aprobación)\n- Usuarios web/móvil: OAuth 2.0 Authorization Code con PKCE, cliente público sin secreto.\n- Servicios y canales backend: OAuth 2.0 Client Credentials, un cliente confidencial por servicio.\n- Las APIs aceptan únicamente access tokens; deben validar firma, `iss`, `client_id`/`aud`,\n  `token_use=access`, `exp` y scopes. TLS es obligatorio fuera de loopback.\n- `/registro` y `/login` con PIN quedan temporalmente para la demo y se marcan como obsoletos;\n  no sustituyen la autenticación de producción.\n\n### Estado de implementación\nEsta versión documenta el **contrato objetivo para acuerdo entre equipos**. Los campos,\nrespuestas asíncronas y controles OAuth nuevos requieren implementación antes de promover\neste contrato a producción.\n",
+    "license": {
+      "name": "Uso interno — confirmar licencia antes de distribución externa"
+    },
+    "x-api-version": "v1",
+    "x-currency": "USD-only",
+    "x-fx-provider": "https://www.exchangerate-api.com",
+    "x-contract-status": "proposed-for-team-review",
+    "x-implementation-status": "not-yet-enforced",
+    "x-breaking-change": true
   },
   "servers": [
     {
-      "url": "http://localhost:3001",
-      "description": "Entorno de Desarrollo / Sandbox Local"
+      "url": "/",
+      "description": "Mismo host que sirve la documentación"
+    }
+  ],
+  "security": [
+    {
+      "UserOAuth2": []
+    },
+    {
+      "ServiceOAuth2": []
+    }
+  ],
+  "x-outbound-service-auth": {
+    "description": "Autenticación usada por Billetera USD al invocar servicios dependientes.",
+    "grant": "client_credentials",
+    "token_url": "https://auth.billetera-usd.example/oauth2/token",
+    "token_url_status": "placeholder-replace-before-production",
+    "required_scopes": {
+      "CustomerAccountPort": "clientes/read",
+      "BalancePort": "saldos/credit"
+    },
+    "token_cache": "Reutilizar el access token hasta 60 segundos antes de expirar; no solicitar uno por operación.",
+    "secret_storage": "AWS Secrets Manager; nunca variables versionadas ni secretos en imágenes."
+  },
+  "tags": [
+    {
+      "name": "Depósitos USD",
+      "description": "Registro de depósitos entrantes de efectivo, transferencia, tarjeta u otro."
+    },
+    {
+      "name": "Billetera",
+      "description": "Gestión de billeteras USD — saldo, depósitos, retiros y transferencias entre usuarios."
+    },
+    {
+      "name": "Tipo de Cambio (FX)",
+      "description": "Consulta de tasa USD/PEN vigente y conversión referencial."
+    },
+    {
+      "name": "Health",
+      "description": "Endpoints de salud para orquestadores y probes de Kubernetes."
+    },
+    {
+      "name": "Sandbox",
+      "description": "Escenarios de integración y limpieza de datos de prueba; requiere SANDBOX_MODE=true fuera de producción para reiniciar."
     }
   ],
   "paths": {
-    "/api/v1/sandbox/reset": {
-      "post": {
-        "summary": "Reinicia los datos de prueba del Sandbox (Fase S)",
-        "description": "Limpia transacciones demo y billeteras con prefijo de prueba para permitir suites reproducibles entre agentes. Bloqueado en producción."
-      }
-    },
     "/api/v1/sandbox/scenarios": {
       "get": {
-        "summary": "Lista los escenarios de simulación disponibles para pruebas de integración de agentes (Fase S)"
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Lista los escenarios de integración disponibles.",
+        "operationId": "sandboxScenarios",
+        "security": [
+          {
+            "ServiceOAuth2": [
+              "billetera/sandbox.manage"
+            ]
+          }
+        ],
+        "x-production-disabled": true,
+        "responses": {
+          "200": {
+            "description": "Estado del sandbox y escenarios disponibles."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/sandbox/reset": {
+      "post": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Elimina datos de prueba con prefijos sandbox- y test-.",
+        "operationId": "sandboxReset",
+        "security": [
+          {
+            "ServiceOAuth2": [
+              "billetera/sandbox.manage"
+            ]
+          }
+        ],
+        "x-production-disabled": true,
+        "responses": {
+          "200": {
+            "description": "Datos de prueba eliminados."
+          },
+          "403": {
+            "description": "Sandbox deshabilitado o entorno de producción."
+          }
+        }
       }
     },
     "/health/live": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
       "get": {
-        "summary": "Proceso vivo (RF-7)"
+        "tags": [
+          "Health"
+        ],
+        "summary": "Liveness probe — proceso vivo (RF-7)",
+        "operationId": "healthLive",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "El proceso está vivo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveResponse"
+                },
+                "example": {
+                  "status": "alive"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/health/ready": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
       "get": {
-        "summary": "Listo para operar (RF-7; no exige MS externos)"
-      }
-    },
-    "/api/v1/fx/tasa": {
-      "get": {
-        "summary": "Tasa USD_PEN vigente, aporte propio (RF-8)"
-      }
-    },
-    "/api/v1/fx/convertir": {
-      "post": {
-        "summary": "Conversión referencial USD<->PEN con tasa vigente (RF-8, solo informativo, no acredita)"
+        "tags": [
+          "Health"
+        ],
+        "summary": "Readiness probe — listo para operar (RF-7)",
+        "operationId": "healthReady",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "El servicio y la base de datos están operativos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                },
+                "example": {
+                  "status": "ready",
+                  "db": "up",
+                  "fakes": true
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "La base de datos no está disponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                },
+                "example": {
+                  "status": "not-ready",
+                  "db": "down",
+                  "fakes": true
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/depositos/usd": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
       "post": {
-        "summary": "Crea un depósito USD (RF-1)"
+        "tags": [
+          "Depósitos USD"
+        ],
+        "summary": "Crear depósito USD (RF-1)",
+        "operationId": "crearDeposito",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/depositos.write"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/depositos.write"
+            ]
+          }
+        ],
+        "description": "Registra un depósito USD entrante. El proceso es **idempotente** —\nreenviar la misma `Idempotency-Key` devuelve el depósito original con HTTP 200.\nSi Saldos confirma el abono y entrega `movimiento_saldo_id`, devuelve HTTP 201\ncon estado `COMPLETADO`. Si Saldos acepta el abono pero lo mantiene pendiente,\ndevuelve HTTP 202 con estado local `VALIDADO`, `Location` y `Retry-After`.\n\nEstados externos `PENDIENTE` o `PROCESANDO` se normalizan a `VALIDADO`.\nNunca se marca `COMPLETADO` basándose únicamente en un HTTP 2xx.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearDepositoRequest"
+              },
+              "example": {
+                "cliente_id": "cli_001",
+                "monto": "250.00",
+                "moneda": "USD",
+                "canal": "APP",
+                "metodo_origen": "TRANSFERENCIA",
+                "referencia_externa": "REF-2026-001"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replay — depósito ya existía (misma Idempotency-Key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deposito"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Depósito creado y abono confirmado explícitamente por Saldos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deposito"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Depósito aceptado; la confirmación del abono continúa de forma asíncrona.",
+            "headers": {
+              "Location": {
+                "description": "URL para consultar el estado definitivo del depósito.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                },
+                "example": "/api/v1/depositos/usd/3fa85f64-5717-4562-b3fc-2c963f66afa6"
+              },
+              "Retry-After": {
+                "description": "Segundos mínimos sugeridos antes de consultar nuevamente.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "example": 5
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deposito"
+                },
+                "example": {
+                  "deposito_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                  "cliente_id": "cli_001",
+                  "monto": "250.00",
+                  "moneda": "USD",
+                  "canal": "APP",
+                  "metodo_origen": "TRANSFERENCIA",
+                  "estado": "VALIDADO",
+                  "movimiento_saldo_id": null,
+                  "creado_en": "2026-11-06T15:00:00.000Z",
+                  "completado_en": null
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/IdempotencyConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
       },
       "get": {
-        "summary": "Historial paginado por cliente (RF-6)"
+        "tags": [
+          "Depósitos USD"
+        ],
+        "summary": "Historial paginado de depósitos por cliente (RF-6)",
+        "operationId": "historialDepositos",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/depositos.read"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/depositos.read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cliente_id",
+            "in": "query",
+            "required": true,
+            "description": "ID del cliente propietario de los depósitos.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "example": "cli_001"
+          },
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Listado paginado de depósitos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistorialDepositos"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
       }
     },
     "/api/v1/depositos/usd/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
       "get": {
-        "summary": "Consulta un depósito por id (RF-6)"
-      }
-    },
-    "/api/v1/billetera/wallets": {
-      "post": {
-        "summary": "Crea billetera USD (RF-9, DOLARA v2 USD-only)"
+        "tags": [
+          "Depósitos USD"
+        ],
+        "summary": "Consultar depósito por ID (RF-6)",
+        "operationId": "consultarDeposito",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/depositos.read"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/depositos.read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DepositoId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Datos completos del depósito.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deposito"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/api/v1/billetera/registro": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
       "post": {
-        "summary": "Registro demo DOLARA — alias + nombre + PIN (RF-13)"
+        "tags": [
+          "Billetera"
+        ],
+        "summary": "Registro de usuario — alias + nombre + PIN (RF-13)",
+        "operationId": "registroUsuario",
+        "deprecated": true,
+        "security": [],
+        "description": "Crea una billetera USD nueva para el alias indicado.  \nEl PIN (4–6 dígitos) se almacena como hash; nunca en claro.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistroRequest"
+              },
+              "example": {
+                "user_id": "mariaperez",
+                "nombre": "María Pérez",
+                "pin": "1234"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Billetera creada. Saldo inicial 0.00 USD.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wallet"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
       }
     },
     "/api/v1/billetera/login": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
       "post": {
-        "summary": "Login demo DOLARA — alias + PIN (RF-13)"
+        "tags": [
+          "Billetera"
+        ],
+        "summary": "Login de usuario — alias + PIN (RF-13)",
+        "operationId": "loginUsuario",
+        "deprecated": true,
+        "security": [],
+        "description": "Verifica alias y PIN; devuelve los datos de la billetera.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              },
+              "example": {
+                "user_id": "mariaperez",
+                "pin": "1234"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Autenticación exitosa.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wallet"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidCredentials"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/api/v1/billetera/usuarios/buscar": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
       "get": {
-        "summary": "Busca usuarios por alias para transferir sin pegar UUIDs (RF-13)"
+        "tags": [
+          "Billetera"
+        ],
+        "summary": "Buscar usuarios por alias para transferencias (RF-13)",
+        "operationId": "buscarUsuarios",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/wallets.read"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/wallets.read"
+            ]
+          }
+        ],
+        "description": "Búsqueda parcial por `user_id` o `nombre` (ILIKE). Retorna hasta 8 resultados.\nMínimo 2 caracteres de búsqueda.\n",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Texto a buscar (mín. 2 caracteres).",
+            "schema": {
+              "type": "string",
+              "minLength": 2
+            },
+            "example": "maria"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultados de la búsqueda.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuscarUsuariosResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
       }
     },
-    "/api/v1/billetera/wallets/by-user/{userId}": {
+    "/api/v1/billetera/wallets": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Billetera"
+        ],
+        "summary": "Crear billetera USD sin PIN (RF-9)",
+        "operationId": "crearBilletera",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/wallets.write"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/wallets.write"
+            ]
+          }
+        ],
+        "description": "Crea una billetera USD usando únicamente `user_id`.\nPara el flujo demo con PIN, usar `/registro`.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearWalletRequest"
+              },
+              "example": {
+                "user_id": "cli_demo_02",
+                "nombre": "Cliente Demo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Billetera creada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wallet"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/billetera/usuarios/{userId}/wallet": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
       "get": {
-        "summary": "Busca billetera USD por user_id (DOLARA UX, RF-9)"
+        "tags": [
+          "Billetera"
+        ],
+        "summary": "Obtener billetera por user_id / alias (RF-9)",
+        "operationId": "billeteraPorUsuario",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/wallets.read"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/wallets.read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "Alias del usuario (ej. `mariaperez`).",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "example": "mariaperez"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Datos de la billetera.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wallet"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/api/v1/billetera/wallets/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
       "get": {
-        "summary": "Saldo de billetera USD (RF-9)"
+        "tags": [
+          "Billetera"
+        ],
+        "summary": "Obtener billetera por UUID (RF-9)",
+        "operationId": "obtenerBilletera",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/wallets.read"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/wallets.read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WalletId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Datos de la billetera con saldo actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wallet"
+                },
+                "example": {
+                  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                  "user_id": "mariaperez",
+                  "nombre": "María Pérez",
+                  "balance": "350.75",
+                  "moneda": "USD",
+                  "estado": "ACTIVE"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/api/v1/billetera/wallets/{id}/depositos": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
       "post": {
-        "summary": "Deposita en billetera local (RF-10)"
+        "tags": [
+          "Billetera"
+        ],
+        "summary": "Depositar en billetera local (RF-10)",
+        "operationId": "depositarBilletera",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/wallets.write"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/wallets.write"
+            ]
+          }
+        ],
+        "description": "Acredita fondos USD en la billetera indicada.  \nOperación atómica con `SELECT ... FOR UPDATE`. Requiere estado `ACTIVE`;\n`BLOCKED` o `CLOSED` devuelve 422 sin crear movimiento.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WalletId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MontoRequest"
+              },
+              "example": {
+                "monto": "100.00"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Depósito acreditado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperacionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
       }
     },
     "/api/v1/billetera/wallets/{id}/retiros": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
       "post": {
-        "summary": "Retira de billetera local (RF-10)"
-      }
-    },
-    "/api/v1/billetera/transferencias": {
-      "post": {
-        "summary": "Transfiere entre billeteras locales, atómica e idempotente (RF-11)"
+        "tags": [
+          "Billetera"
+        ],
+        "summary": "Retirar de billetera local (RF-10)",
+        "operationId": "retirarBilletera",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/wallets.write"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/wallets.write"
+            ]
+          }
+        ],
+        "description": "Debita fondos USD de la billetera.  \nDevuelve 422 si el saldo es insuficiente o la billetera no está `ACTIVE`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WalletId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MontoRequest"
+              },
+              "example": {
+                "monto": "50.00"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Retiro procesado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperacionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
       }
     },
     "/api/v1/billetera/wallets/{id}/movimientos": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
       "get": {
-        "summary": "Historial USD paginado (RF-12)"
+        "tags": [
+          "Billetera"
+        ],
+        "summary": "Historial de movimientos paginado (RF-12)",
+        "operationId": "movimientosBilletera",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/wallets.read"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/wallets.read"
+            ]
+          }
+        ],
+        "description": "Devuelve el historial de movimientos USD de una billetera, ordenado por fecha descendente.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WalletId"
+          },
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historial paginado de movimientos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistorialMovimientos"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/billetera/transferencias": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Billetera"
+        ],
+        "summary": "Transferir entre billeteras (atómica e idempotente) (RF-11)",
+        "operationId": "transferirBilleteras",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/transferencias.write"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/transferencias.write"
+            ]
+          }
+        ],
+        "description": "Transfiere USD de una billetera a otra de forma **atómica**.\n- Acepta UUID o alias (`user_id`) en `origen_id` y `destino_id`.\n- Es idempotente: reenviar la misma `Idempotency-Key` devuelve la transferencia original.\n- Usa `SELECT ... FOR UPDATE` con bloqueo ordenado por UUID para prevenir deadlocks.\n- Origen y destino deben estar `ACTIVE`; una billetera `BLOCKED` o `CLOSED`\n  rechaza la operación completa sin débito parcial.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferenciaRequest"
+              },
+              "example": {
+                "origen_id": "mariaperez",
+                "destino_id": "juancarlos",
+                "monto": "75.50"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replay — transferencia ya procesada (misma Idempotency-Key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferenciaResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Transferencia ejecutada exitosamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferenciaResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/IdempotencyConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      }
+    },
+    "/api/v1/fx/tasa": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Tipo de Cambio (FX)"
+        ],
+        "summary": "Tasa direccional USD/PEN o PEN/USD vigente (RF-8)",
+        "operationId": "obtenerTasa",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/fx.read"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/fx.read"
+            ]
+          }
+        ],
+        "description": "Retorna una tasa indicativa obtenida de ExchangeRate-API y cacheada en PostgreSQL.\n`USD_PEN` devuelve la tasa directa del proveedor; `PEN_USD` devuelve su recíproco\nredondeado a seis decimales. La caché respeta la próxima actualización informada\npor el proveedor (24 horas en su endpoint abierto). Si la fuente falla, se devuelve\nla última cotización con `stale: true`; responde 503 únicamente si tampoco existe caché.\n",
+        "externalDocs": {
+          "description": "Documentación del endpoint abierto de ExchangeRate-API",
+          "url": "https://www.exchangerate-api.com/docs/free"
+        },
+        "parameters": [
+          {
+            "name": "par",
+            "in": "query",
+            "required": false,
+            "description": "Par direccional solicitado.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "USD_PEN",
+                "PEN_USD"
+              ],
+              "default": "USD_PEN"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tasa de cambio vigente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TasaResponse"
+                },
+                "example": {
+                  "par": "USD_PEN",
+                  "tasa": "3.720000",
+                  "fuente": "ExchangeRate-API",
+                  "actualizada_en": "2026-11-02T00:02:31.000Z",
+                  "proxima_actualizacion_en": "2026-11-03T00:06:21.000Z",
+                  "stale": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/fx/convertir": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CorrelationId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Tipo de Cambio (FX)"
+        ],
+        "summary": "Conversión referencial USD ↔ PEN (RF-8)",
+        "operationId": "convertirDivisas",
+        "security": [
+          {
+            "UserOAuth2": [
+              "billetera/fx.read"
+            ]
+          },
+          {
+            "ServiceOAuth2": [
+              "billetera/fx.read"
+            ]
+          }
+        ],
+        "description": "Calcula una conversión referencial informativa entre USD y PEN.  \n**No acredita fondos** — el saldo de la billetera permanece siempre en USD.\nCasos soportados: USD→PEN, PEN→USD, USD→USD y PEN→PEN. Las conversiones\ncruzadas usan la cotización externa vigente; las conversiones identidad usan tasa 1.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConvertirRequest"
+              },
+              "example": {
+                "monto": "100.00",
+                "de": "USD",
+                "a": "PEN"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado de la conversión.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConvertirResponse"
+                },
+                "example": {
+                  "monto_origen": "100.00",
+                  "moneda_origen": "USD",
+                  "monto_convertido": "372.00",
+                  "moneda_destino": "PEN",
+                  "tasa": "3.720000",
+                  "par": "USD_PEN",
+                  "fuente": "ExchangeRate-API",
+                  "actualizada_en": "2026-11-02T00:02:31.000Z",
+                  "stale": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
       }
     }
   },
-  "components": {},
-  "tags": []
+  "components": {
+    "securitySchemes": {
+      "UserOAuth2": {
+        "type": "oauth2",
+        "description": "Usuarios web/móvil mediante Authorization Code con PKCE (`S256`).\nEl cliente SPA es público y no debe tener ni almacenar un client secret.\nLa API acepta el access token en `Authorization: Bearer <token>`.\n",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://auth.billetera-usd.example/oauth2/authorize",
+            "tokenUrl": "https://auth.billetera-usd.example/oauth2/token",
+            "scopes": {
+              "billetera/depositos.read": "Consultar depósitos propios.",
+              "billetera/depositos.write": "Crear depósitos propios.",
+              "billetera/wallets.read": "Consultar billetera, usuarios y movimientos permitidos.",
+              "billetera/wallets.write": "Crear billetera, depositar o retirar según autorización.",
+              "billetera/transferencias.write": "Ejecutar transferencias desde la billetera autorizada.",
+              "billetera/fx.read": "Consultar tasas y conversiones referenciales."
+            }
+          }
+        },
+        "x-pkce-required": true,
+        "x-pkce-method": "S256",
+        "x-token-type": "access"
+      },
+      "ServiceOAuth2": {
+        "type": "oauth2",
+        "description": "Servicios backend y canales confidenciales mediante Client Credentials.\nCada servicio debe tener su propio client id/secret y únicamente los scopes mínimos.\nEl secreto se usa solo contra el servidor de autorización y nunca se envía a esta API.\n",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://auth.billetera-usd.example/oauth2/token",
+            "scopes": {
+              "billetera/depositos.read": "Consultar depósitos autorizados.",
+              "billetera/depositos.write": "Crear depósitos desde canales autorizados.",
+              "billetera/wallets.read": "Consultar billeteras y movimientos autorizados.",
+              "billetera/wallets.write": "Operar billeteras autorizadas.",
+              "billetera/transferencias.write": "Ejecutar transferencias autorizadas.",
+              "billetera/fx.read": "Consultar tasas y conversiones referenciales.",
+              "billetera/sandbox.manage": "Administrar solo datos de sandbox; prohibido en producción."
+            }
+          }
+        },
+        "x-token-type": "access",
+        "x-client-per-service": true,
+        "x-secret-storage": "AWS Secrets Manager"
+      }
+    },
+    "parameters": {
+      "CorrelationId": {
+        "name": "X-Correlation-Id",
+        "in": "header",
+        "required": false,
+        "description": "UUID de correlación opcional. Si falta o es inválido, la API genera uno nuevo.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "UUID v4 único por intento de escritura. Permite reintentos seguros.",
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+        },
+        "example": "550e8400-e29b-41d4-a716-446655440000"
+      },
+      "DepositoId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "UUID del depósito.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      },
+      "WalletId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "UUID de la billetera.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      },
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "description": "Número de página (desde 1).",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "example": 1
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Registros por página (máx. 100).",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20
+        },
+        "example": 20
+      }
+    },
+    "schemas": {
+      "CrearDepositoRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cliente_id",
+          "monto",
+          "canal",
+          "metodo_origen"
+        ],
+        "description": "`canal` identifica dónde se originó la solicitud; `metodo_origen` identifica\nel instrumento o rail de fondos. Son dimensiones independientes y ambas deben\nconservarse para auditoría.\n",
+        "x-channel-method-policy": {
+          "VENTANILLA": [
+            "EFECTIVO"
+          ],
+          "AGENTE": [
+            "EFECTIVO"
+          ],
+          "APP": [
+            "TRANSFERENCIA",
+            "TARJETA",
+            "OTRO"
+          ]
+        },
+        "properties": {
+          "cliente_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Identificador del cliente que realiza el depósito.",
+            "example": "cli_001"
+          },
+          "cuenta_destino_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "nullable": true,
+            "description": "ID de cuenta destino (opcional).",
+            "example": "cta_mx_01"
+          },
+          "monto": {
+            "$ref": "#/components/schemas/Monto"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ],
+            "description": "Solo se acepta USD. Si se omite, se asume USD.",
+            "example": "USD"
+          },
+          "canal": {
+            "type": "string",
+            "enum": [
+              "VENTANILLA",
+              "AGENTE",
+              "APP"
+            ],
+            "description": "Canal que recibió la instrucción; no sustituye al método de origen.",
+            "example": "APP"
+          },
+          "metodo_origen": {
+            "type": "string",
+            "enum": [
+              "EFECTIVO",
+              "TRANSFERENCIA",
+              "TARJETA",
+              "OTRO"
+            ],
+            "description": "Instrumento o rail real por el que ingresan los fondos.",
+            "example": "TRANSFERENCIA"
+          },
+          "referencia_externa": {
+            "type": "string",
+            "maxLength": 120,
+            "nullable": true,
+            "description": "Número de referencia del banco o proveedor externo.",
+            "example": "REF-2026-001"
+          }
+        }
+      },
+      "RegistroRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "user_id",
+          "nombre",
+          "pin"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 30,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "description": "Alias único (minúsculas, números, guiones). Se normaliza a minúsculas.",
+            "example": "mariaperez"
+          },
+          "nombre": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60,
+            "description": "Nombre completo del usuario.",
+            "example": "María Pérez"
+          },
+          "pin": {
+            "type": "string",
+            "pattern": "^\\d{4,6}$",
+            "description": "PIN numérico de 4 a 6 dígitos. Se almacena como hash.",
+            "example": "1234"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "user_id",
+          "pin"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 30,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "example": "mariaperez"
+          },
+          "pin": {
+            "type": "string",
+            "pattern": "^\\d{4,6}$",
+            "example": "1234"
+          }
+        }
+      },
+      "CrearWalletRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "user_id"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Identificador del usuario dueño de la billetera.",
+            "example": "cli_demo_02"
+          },
+          "nombre": {
+            "type": "string",
+            "maxLength": 60,
+            "nullable": true,
+            "description": "Nombre descriptivo (opcional).",
+            "example": "Cliente Demo"
+          }
+        }
+      },
+      "MontoRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "monto"
+        ],
+        "properties": {
+          "monto": {
+            "$ref": "#/components/schemas/Monto"
+          }
+        }
+      },
+      "TransferenciaRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "origen_id",
+          "destino_id",
+          "monto"
+        ],
+        "properties": {
+          "origen_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "UUID o alias de la billetera origen.",
+            "example": "mariaperez"
+          },
+          "destino_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "UUID o alias de la billetera destino.",
+            "example": "juancarlos"
+          },
+          "monto": {
+            "$ref": "#/components/schemas/Monto"
+          }
+        }
+      },
+      "ConvertirRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "monto",
+          "de",
+          "a"
+        ],
+        "properties": {
+          "monto": {
+            "$ref": "#/components/schemas/Monto"
+          },
+          "de": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "PEN"
+            ],
+            "description": "Moneda de origen.",
+            "example": "USD"
+          },
+          "a": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "PEN"
+            ],
+            "description": "Moneda de destino.",
+            "example": "PEN"
+          }
+        }
+      },
+      "Deposito": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "deposito_id",
+          "cliente_id",
+          "monto",
+          "moneda",
+          "canal",
+          "metodo_origen",
+          "estado",
+          "creado_en"
+        ],
+        "properties": {
+          "deposito_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "cliente_id": {
+            "type": "string",
+            "example": "cli_001"
+          },
+          "cuenta_destino_id": {
+            "type": "string",
+            "nullable": true,
+            "example": "cta_mx_01"
+          },
+          "monto": {
+            "$ref": "#/components/schemas/Monto"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ],
+            "example": "USD"
+          },
+          "canal": {
+            "type": "string",
+            "enum": [
+              "VENTANILLA",
+              "AGENTE",
+              "APP"
+            ],
+            "example": "APP"
+          },
+          "metodo_origen": {
+            "type": "string",
+            "enum": [
+              "EFECTIVO",
+              "TRANSFERENCIA",
+              "TARJETA",
+              "OTRO"
+            ],
+            "example": "TRANSFERENCIA"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE",
+              "VALIDADO",
+              "COMPLETADO",
+              "FALLIDO"
+            ],
+            "example": "COMPLETADO"
+          },
+          "movimiento_saldo_id": {
+            "type": "string",
+            "nullable": true,
+            "example": "mov_001"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-30T15:00:00.000Z"
+          },
+          "completado_en": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-10-30T15:00:05.000Z"
+          }
+        }
+      },
+      "HistorialDepositos": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total",
+          "correlation_id"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "deposito_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "monto": {
+                  "$ref": "#/components/schemas/Monto"
+                },
+                "moneda": {
+                  "type": "string",
+                  "enum": [
+                    "USD"
+                  ]
+                },
+                "estado": {
+                  "type": "string",
+                  "enum": [
+                    "PENDIENTE",
+                    "VALIDADO",
+                    "COMPLETADO",
+                    "FALLIDO"
+                  ]
+                },
+                "creado_en": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "example": 20
+          },
+          "total": {
+            "type": "integer",
+            "example": 45
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "Wallet": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "user_id",
+          "nombre",
+          "balance",
+          "moneda",
+          "estado"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID de la billetera.",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "Alias del usuario dueño.",
+            "example": "mariaperez"
+          },
+          "nombre": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre descriptivo del titular.",
+            "example": "María Pérez"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Monto"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ],
+            "example": "USD"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "BLOCKED",
+              "CLOSED"
+            ],
+            "description": "Estado operativo de la billetera. `BLOCKED` impide operaciones monetarias;\n`CLOSED` es terminal y tampoco acepta créditos. Las consultas autorizadas\npueden seguir disponibles para auditoría.\n",
+            "example": "ACTIVE"
+          }
+        }
+      },
+      "OperacionResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "movimiento_id",
+          "balance",
+          "moneda"
+        ],
+        "description": "Resultado de una operación de depósito o retiro en billetera.",
+        "properties": {
+          "movimiento_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID del movimiento registrado.",
+            "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Monto"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ],
+            "example": "USD"
+          }
+        }
+      },
+      "TransferenciaResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "referencia",
+          "origen_balance",
+          "destino_balance",
+          "moneda",
+          "replay"
+        ],
+        "properties": {
+          "referencia": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID único de la transferencia (compartido en ambos movimientos).",
+            "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+          },
+          "origen_balance": {
+            "$ref": "#/components/schemas/Monto"
+          },
+          "destino_balance": {
+            "$ref": "#/components/schemas/Monto"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ],
+            "example": "USD"
+          },
+          "replay": {
+            "type": "boolean",
+            "description": "true si la respuesta es un replay de una transferencia previa.",
+            "example": false
+          }
+        }
+      },
+      "BuscarUsuariosResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "UUID de la billetera."
+                },
+                "user_id": {
+                  "type": "string",
+                  "description": "Alias del usuario."
+                },
+                "nombre": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Nombre completo del usuario."
+                }
+              }
+            },
+            "example": [
+              {
+                "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "user_id": "mariaperez",
+                "nombre": "María Pérez"
+              }
+            ]
+          }
+        }
+      },
+      "HistorialMovimientos": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total",
+          "moneda"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Movimiento"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "example": 20
+          },
+          "total": {
+            "type": "integer",
+            "example": 12
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ],
+            "example": "USD"
+          }
+        }
+      },
+      "Movimiento": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "tipo",
+          "monto",
+          "moneda",
+          "saldo_resultante",
+          "referencia",
+          "creado_en"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "deposito",
+              "retiro",
+              "transfer_in",
+              "transfer_out"
+            ],
+            "example": "transfer_out"
+          },
+          "monto": {
+            "$ref": "#/components/schemas/Monto"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ],
+            "example": "USD"
+          },
+          "saldo_resultante": {
+            "$ref": "#/components/schemas/Monto"
+          },
+          "referencia": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "UUID de la transferencia relacionada (si aplica)."
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-30T15:00:00.000Z"
+          }
+        }
+      },
+      "TasaResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "par",
+          "tasa",
+          "fuente",
+          "actualizada_en",
+          "proxima_actualizacion_en",
+          "stale"
+        ],
+        "properties": {
+          "par": {
+            "type": "string",
+            "enum": [
+              "USD_PEN",
+              "PEN_USD"
+            ],
+            "example": "USD_PEN"
+          },
+          "tasa": {
+            "type": "string",
+            "description": "Tasa de cambio con 6 decimales.",
+            "example": "3.720000"
+          },
+          "fuente": {
+            "type": "string",
+            "description": "Proveedor externo de la tasa.",
+            "example": "ExchangeRate-API"
+          },
+          "actualizada_en": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp de actualización de la cotización informado por el proveedor.",
+            "example": "2026-11-02T00:02:31.000Z"
+          },
+          "proxima_actualizacion_en": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Próxima actualización anunciada por el proveedor; null para caché histórica sin ese metadato.",
+            "example": "2026-11-03T00:06:21.000Z"
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "true cuando se devuelve una tasa vencida porque la fuente externa no respondió.",
+            "example": false
+          }
+        }
+      },
+      "ConvertirResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "monto_origen",
+          "moneda_origen",
+          "monto_convertido",
+          "moneda_destino",
+          "tasa",
+          "par"
+        ],
+        "properties": {
+          "monto_origen": {
+            "$ref": "#/components/schemas/Monto"
+          },
+          "moneda_origen": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "PEN"
+            ],
+            "example": "USD"
+          },
+          "monto_convertido": {
+            "$ref": "#/components/schemas/Monto"
+          },
+          "moneda_destino": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "PEN"
+            ],
+            "example": "PEN"
+          },
+          "tasa": {
+            "type": "string",
+            "description": "Tasa direccional utilizada; para PEN→USD es el recíproco de USD→PEN.",
+            "example": "3.720000"
+          },
+          "par": {
+            "type": "string",
+            "enum": [
+              "USD_PEN",
+              "PEN_USD",
+              "USD_USD",
+              "PEN_PEN"
+            ],
+            "example": "USD_PEN"
+          },
+          "fuente": {
+            "type": "string",
+            "description": "Proveedor externo; se omite en conversiones identidad.",
+            "example": "ExchangeRate-API"
+          },
+          "actualizada_en": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Actualización de la cotización externa; se omite en conversiones identidad."
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "Indica si se usó la última cotización disponible por una falla del proveedor."
+          }
+        }
+      },
+      "LiveResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "alive"
+            ],
+            "example": "alive"
+          }
+        }
+      },
+      "ReadyResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "db",
+          "fakes"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "not-ready"
+            ],
+            "example": "ready"
+          },
+          "db": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "example": "up"
+          },
+          "fakes": {
+            "type": "boolean",
+            "description": "true si el servicio usa adaptadores fake (sin MS externos reales).",
+            "example": true
+          }
+        }
+      },
+      "Monto": {
+        "type": "string",
+        "pattern": "^\\d+(\\.\\d{1,2})?$",
+        "description": "Monto decimal como string. Sin floats. Máx. 9999999999.99.",
+        "example": "150.50"
+      },
+      "ApiError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "code",
+          "message",
+          "correlation_id",
+          "timestamp"
+        ],
+        "description": "Formato estándar de error para todos los endpoints.",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "Código HTTP.",
+            "example": 400
+          },
+          "code": {
+            "type": "string",
+            "description": "Código de error de negocio para manejo programático.",
+            "example": "VALIDATION_ERROR"
+          },
+          "message": {
+            "type": "string",
+            "description": "Descripción legible del error.",
+            "example": "Idempotency-Key obligatorio"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID de correlación para trazabilidad. También en header `X-Correlation-Id`.",
+            "example": "7cd14140-2c6d-4fac-b522-76e66a51e2aa"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-30T20:00:00.000Z"
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Petición inválida. Posibles códigos: `VALIDATION_ERROR`, `INVALID_AMOUNT`,\n`SIN_IDEMPOTENCIA`, `MISMA_BILLETERA`, `MONTO_INVALIDO`.\n",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "status": 400,
+              "code": "VALIDATION_ERROR",
+              "message": "Idempotency-Key obligatorio",
+              "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+              "timestamp": "2026-10-30T15:00:00.000Z"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Access token ausente, inválido, expirado o de tipo incorrecto.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "status": 401,
+              "code": "UNAUTHORIZED",
+              "message": "access token ausente o inválido",
+              "correlation_id": "550e8400-e29b-41d4-a716-446655440001",
+              "timestamp": "2026-11-06T15:00:00.000Z"
+            }
+          }
+        }
+      },
+      "InvalidCredentials": {
+        "description": "Credenciales del flujo demo incorrectas.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "status": 401,
+              "code": "PIN_INCORRECTO",
+              "message": "PIN incorrecto",
+              "correlation_id": "550e8400-e29b-41d4-a716-446655440010",
+              "timestamp": "2026-11-06T15:00:00.000Z"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Token válido, pero sin el scope requerido o sin acceso al recurso solicitado.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "status": 403,
+              "code": "INSUFFICIENT_SCOPE",
+              "message": "el token no posee el scope requerido",
+              "correlation_id": "550e8400-e29b-41d4-a716-446655440007",
+              "timestamp": "2026-11-06T15:00:00.000Z"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Recurso no encontrado. Código `NOT_FOUND` o `NO_ENCONTRADA`.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "status": 404,
+              "code": "NOT_FOUND",
+              "message": "depósito no existe",
+              "correlation_id": "550e8400-e29b-41d4-a716-446655440002",
+              "timestamp": "2026-10-30T15:00:00.000Z"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Recurso ya existe. Código `YA_EXISTE`.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "status": 409,
+              "code": "YA_EXISTE",
+              "message": "ese alias ya está registrado, inicia sesión",
+              "correlation_id": "550e8400-e29b-41d4-a716-446655440003",
+              "timestamp": "2026-10-30T15:00:00.000Z"
+            }
+          }
+        }
+      },
+      "IdempotencyConflict": {
+        "description": "La misma Idempotency-Key fue usada con un payload diferente.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "status": 409,
+              "code": "IDEMPOTENCY_CONFLICT",
+              "message": "misma clave con datos diferentes",
+              "correlation_id": "550e8400-e29b-41d4-a716-446655440006",
+              "timestamp": "2026-10-30T15:00:00.000Z"
+            }
+          }
+        }
+      },
+      "UnprocessableEntity": {
+        "description": "Regla de negocio violada. Códigos posibles: `FONDOS_INSUFICIENTES`,\n`CUSTOMER_BLOCKED`, `USD_ACCOUNT_NOT_ENABLED`, `WALLET_BLOCKED`, `WALLET_CLOSED`.\n",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "status": 422,
+              "code": "FONDOS_INSUFICIENTES",
+              "message": "fondos insuficientes",
+              "correlation_id": "550e8400-e29b-41d4-a716-446655440004",
+              "timestamp": "2026-10-30T15:00:00.000Z"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Límite de solicitudes excedido. El cliente debe respetar `Retry-After`.",
+        "headers": {
+          "Retry-After": {
+            "description": "Segundos antes del próximo intento.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "example": 30
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "status": 429,
+              "code": "RATE_LIMITED",
+              "message": "demasiadas solicitudes",
+              "correlation_id": "550e8400-e29b-41d4-a716-446655440008",
+              "timestamp": "2026-11-06T15:00:00.000Z"
+            }
+          }
+        }
+      },
+      "BadGateway": {
+        "description": "La dependencia respondió, pero su payload o estado no cumple el contrato.\nCódigos: `BALANCE_INVALID_RESPONSE`, `BALANCE_UNEXPECTED_STATE`.\n",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "status": 502,
+              "code": "BALANCE_UNEXPECTED_STATE",
+              "message": "Saldos devolvió un estado no reconocido",
+              "correlation_id": "550e8400-e29b-41d4-a716-446655440009",
+              "timestamp": "2026-11-06T15:00:00.000Z"
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Timeout, error de red o dependencia temporalmente no disponible.",
+        "headers": {
+          "Retry-After": {
+            "description": "Segundos sugeridos antes de reintentar, cuando sea seguro hacerlo.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "example": 10
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "status": 503,
+              "code": "FX_NO_DISPONIBLE",
+              "message": "tasa no disponible",
+              "correlation_id": "550e8400-e29b-41d4-a716-446655440005",
+              "timestamp": "2026-10-30T15:00:00.000Z"
+            }
+          }
+        }
+      }
+    }
+  }
 }

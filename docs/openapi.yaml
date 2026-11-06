@@ -1,37 +1,115 @@
-openapi: 3.1.0
+openapi: 3.0.3
 
 info:
-  title: DOLARA — Billetera Digital USD API
-  version: 2.0.0
+  title: Billetera Digital USD API
+  version: 1.2.0
   description: |
-    API del microservicio **DOLARA Billetera en Dólares** (USD-only).  
+    Contrato REST de **Billetera Digital USD**.
     Permite crear depósitos, operar billeteras, transferir fondos y consultar tasas FX.
 
     ### Convenciones
     - Todos los montos se representan como **strings decimales** (`"150.50"`) — sin floats.
     - Todas las billeteras operan exclusivamente en **USD**.
-    - Los endpoints de escritura con riesgo de duplicación requieren el header **`Idempotency-Key`** (UUID v4).
-    - Los errores devuelven siempre el esquema `ApiError` con `correlation_id` trazable.
+    - Los endpoints idempotentes requieren **`Idempotency-Key`** como UUID v4.
+    - Toda respuesta incluye `X-Correlation-Id`; los errores usan siempre `ApiError`.
+    - `GET /health/ready` conserva su respuesta operacional `ReadyResponse` incluso cuando devuelve 503.
+    - Las conversiones USD/PEN son referenciales y usan una cotización externa de ExchangeRate-API.
 
-    ### Autenticación
-    Esta versión es **demo sin autenticación** (usa `USE_FAKES=true`). Los endpoints de billetera
-    están protegidos únicamente por un PIN de 4–6 dígitos hasheado con SHA-256 (C3/S-8).
+    ### Seguridad objetivo (propuesta para aprobación)
+    - Usuarios web/móvil: OAuth 2.0 Authorization Code con PKCE, cliente público sin secreto.
+    - Servicios y canales backend: OAuth 2.0 Client Credentials, un cliente confidencial por servicio.
+    - Las APIs aceptan únicamente access tokens; deben validar firma, `iss`, `client_id`/`aud`,
+      `token_use=access`, `exp` y scopes. TLS es obligatorio fuera de loopback.
+    - `/registro` y `/login` con PIN quedan temporalmente para la demo y se marcan como obsoletos;
+      no sustituyen la autenticación de producción.
 
-  contact:
-    name: Equipo DOLARA
-    url: https://github.com/Sebitafx/dolara-billetera-usd
+    ### Estado de implementación
+    Contrato funcional y técnico **aprobado por el propietario el 2026-11-06**. Los campos,
+    respuestas asíncronas y controles OAuth nuevos requieren implementación y pruebas antes
+    de promover esta revisión a producción.
+
+    ### Límite funcional aprobado
+    Incluye únicamente identidad necesaria para operar la billetera, saldo y ledger en USD,
+    depósitos USD, retiros USD, transferencias USD, historial, estado operativo de billeteras
+    y equivalencia referencial USD/PEN. Esta API nunca acredita ni mantiene PEN; la billetera
+    de soles conserva la propiedad exclusiva de su saldo y ledger PEN.
+
+    Quedan fuera de alcance: saldos multimoneda, cambio con liquidación, compraventa de divisas,
+    criptoactivos, préstamos, inversiones, emisión/procesamiento de tarjetas, remesas y funciones
+    bancarias que no sean necesarias para esta billetera digital en dólares.
   license:
-    name: Propietario
+    name: Uso interno — confirmar licencia antes de distribución externa
   x-api-version: v1
   x-currency: USD-only
+  x-fx-provider: https://www.exchangerate-api.com
+  x-contract-status: approved
+  x-approved-on: 2026-11-06
+  x-approved-by: product-owner
+  x-implementation-status: approved-pending-implementation
+  x-breaking-change: true
+  x-ledger-currency: USD
+  x-pen-usage: reference-only
+  x-bounded-context: wallet-usd
+
+x-wallet-integration-boundary:
+  usd_owner: Billetera Digital USD
+  pen_owner: Billetera Digital PEN
+  invariants:
+    - Cada billetera escribe únicamente su propio ledger y moneda.
+    - Toda orden, movimiento y evento declara `moneda` y el contexto emisor.
+    - Esta API rechaza cualquier operación monetaria PEN; PEN solo aparece en respuestas FX referenciales.
+    - La unión de proyectos no fusiona saldos ni movimientos por `user_id`; la identidad puede compartirse, los ledgers no.
+    - Una conversión con liquidación futura requiere un contrato y una orquestación separados; no se infiere de `/fx/convertir`.
+
+x-functional-scope:
+  included:
+    - identidad mínima para operar la billetera
+    - saldo y movimientos exclusivamente USD
+    - depósitos, retiros y transferencias USD
+    - historial y estados operativos de billetera
+    - conversión USD/PEN exclusivamente referencial
+    - interoperabilidad segura con la billetera PEN mediante fronteras de moneda explícitas
+  excluded:
+    - saldos o ledger multimoneda
+    - liquidación o compraventa de divisas
+    - criptoactivos, préstamos e inversiones
+    - emisión o procesamiento de tarjetas
+    - remesas y productos bancarios ajenos a la billetera USD
 
 servers:
-  - url: http://54.89.198.163
-    description: Producción — EC2 (k3s)
-  - url: http://localhost:3001
-    description: Desarrollo local (backend directo)
-  - url: http://localhost:4200
-    description: Desarrollo local (Angular + proxy)
+  - url: /
+    description: Mismo host que sirve la documentación
+
+security:
+  - UserOAuth2: []
+  - ServiceOAuth2: []
+
+x-outbound-service-auth:
+  description: Autenticación usada por Billetera USD al invocar servicios dependientes.
+  grant: client_credentials
+  token_url: https://auth.billetera-usd.example/oauth2/token
+  token_url_status: placeholder-replace-before-production
+  required_scopes:
+    CustomerAccountPort: clientes/read
+    BalancePort: saldos/credit
+  token_cache: Reutilizar el access token hasta 60 segundos antes de expirar; no solicitar uno por operación.
+  secret_storage: AWS Secrets Manager; nunca variables versionadas ni secretos en imágenes.
+
+x-jwt-validation:
+  accepted_token_use: access
+  required_claims: [iss, exp, iat, token_use, client_id, scope]
+  allowed_clock_skew_seconds: 60
+  jwks: Cachear claves y refrescar al encontrar un `kid` desconocido; nunca desactivar la validación de firma.
+  audience_policy: Permitir únicamente app client IDs configurados por ambiente.
+  resource_authorization: Validar propiedad de la billetera además del scope; un scope por sí solo no concede acceso a recursos ajenos.
+
+x-quality-gates:
+  contract: OpenAPI válido, sin referencias rotas y con pruebas de compatibilidad de consumidores.
+  tests: Unitarias, integración PostgreSQL, contrato, E2E, concurrencia, idempotencia y seguridad.
+  security: Sin vulnerabilidades críticas/altas no aceptadas; secretos y tokens ausentes de código, imágenes y logs.
+  data: Migraciones compatibles, respaldo previo, rollback documentado y restauración probada.
+  delivery: Despliegue progresivo, probes saludables y rollback automático ante regresión.
+  observability: Correlation ID, auditoría, métricas, logs estructurados y alertas de operaciones VALIDADO envejecidas.
 
 tags:
   - name: Depósitos USD
@@ -42,18 +120,61 @@ tags:
     description: Consulta de tasa USD/PEN vigente y conversión referencial.
   - name: Health
     description: Endpoints de salud para orquestadores y probes de Kubernetes.
+  - name: Sandbox
+    description: Mecanismo interno de calidad; no forma parte del negocio y debe estar deshabilitado en producción.
 
 # ─────────────────────────────────────────────────────────────────────
 # PATHS
 # ─────────────────────────────────────────────────────────────────────
 paths:
 
+  /api/v1/sandbox/scenarios:
+    get:
+      tags: [Sandbox]
+      summary: Lista los escenarios de integración disponibles.
+      operationId: sandboxScenarios
+      security:
+        - ServiceOAuth2: [billetera/sandbox.manage]
+      x-production-disabled: true
+      x-api-surface: internal-quality-only
+      responses:
+        '200':
+          description: Estado del sandbox y escenarios disponibles.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/sandbox/reset:
+    post:
+      tags: [Sandbox]
+      summary: Elimina datos de prueba con prefijos sandbox- y test-.
+      operationId: sandboxReset
+      security:
+        - ServiceOAuth2: [billetera/sandbox.manage]
+      x-production-disabled: true
+      x-api-surface: internal-quality-only
+      responses:
+        '200':
+          description: Datos de prueba eliminados.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Sandbox deshabilitado o entorno de producción.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
   # ── HEALTH ──────────────────────────────────────────────────────────
   /health/live:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     get:
       tags: [Health]
       summary: Liveness probe — proceso vivo (RF-7)
       operationId: healthLive
+      security: []
       responses:
         '200':
           description: El proceso está vivo.
@@ -65,10 +186,13 @@ paths:
                 status: alive
 
   /health/ready:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     get:
       tags: [Health]
       summary: Readiness probe — listo para operar (RF-7)
       operationId: healthReady
+      security: []
       responses:
         '200':
           description: El servicio y la base de datos están operativos.
@@ -93,14 +217,24 @@ paths:
 
   # ── DEPÓSITOS USD ───────────────────────────────────────────────────
   /api/v1/depositos/usd:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     post:
       tags: [Depósitos USD]
       summary: Crear depósito USD (RF-1)
       operationId: crearDeposito
+      security:
+        - UserOAuth2: [billetera/depositos.write]
+        - ServiceOAuth2: [billetera/depositos.write]
       description: |
         Registra un depósito USD entrante. El proceso es **idempotente** —
         reenviar la misma `Idempotency-Key` devuelve el depósito original con HTTP 200.
-        Si es nuevo, devuelve HTTP 201.
+        Si Saldos confirma el abono y entrega `movimiento_saldo_id`, devuelve HTTP 201
+        con estado `COMPLETADO`. Si Saldos acepta el abono pero lo mantiene pendiente,
+        devuelve HTTP 202 con estado local `VALIDADO`, `Location` y `Retry-After`.
+
+        Estados externos `PENDIENTE` o `PROCESANDO` se normalizan a `VALIDADO`.
+        Nunca se marca `COMPLETADO` basándose únicamente en un HTTP 2xx.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -113,15 +247,46 @@ paths:
               cliente_id: cli_001
               monto: "250.00"
               moneda: USD
+              canal: APP
               metodo_origen: TRANSFERENCIA
               referencia_externa: REF-2026-001
       responses:
         '201':
-          description: Depósito creado exitosamente.
+          description: Depósito creado y abono confirmado explícitamente por Saldos.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Deposito'
+        '202':
+          description: Depósito aceptado; la confirmación del abono continúa de forma asíncrona.
+          headers:
+            Location:
+              description: URL para consultar el estado definitivo del depósito.
+              schema:
+                type: string
+                format: uri-reference
+              example: /api/v1/depositos/usd/3fa85f64-5717-4562-b3fc-2c963f66afa6
+            Retry-After:
+              description: Segundos mínimos sugeridos antes de consultar nuevamente.
+              schema:
+                type: integer
+                minimum: 1
+              example: 5
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deposito'
+              example:
+                deposito_id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                cliente_id: cli_001
+                monto: "250.00"
+                moneda: USD
+                canal: APP
+                metodo_origen: TRANSFERENCIA
+                estado: VALIDADO
+                movimiento_saldo_id: null
+                creado_en: "2026-11-06T15:00:00.000Z"
+                completado_en: null
         '200':
           description: Replay — depósito ya existía (misma Idempotency-Key).
           content:
@@ -130,13 +295,30 @@ paths:
                 $ref: '#/components/schemas/Deposito'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
     get:
       tags: [Depósitos USD]
       summary: Historial paginado de depósitos por cliente (RF-6)
       operationId: historialDepositos
+      security:
+        - UserOAuth2: [billetera/depositos.read]
+        - ServiceOAuth2: [billetera/depositos.read]
       parameters:
         - name: cliente_id
           in: query
@@ -159,11 +341,23 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
   /api/v1/depositos/usd/{id}:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     get:
       tags: [Depósitos USD]
       summary: Consultar depósito por ID (RF-6)
       operationId: consultarDeposito
+      security:
+        - UserOAuth2: [billetera/depositos.read]
+        - ServiceOAuth2: [billetera/depositos.read]
       parameters:
         - $ref: '#/components/parameters/DepositoId'
       responses:
@@ -178,15 +372,26 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
   # ── BILLETERA ────────────────────────────────────────────────────────
   /api/v1/billetera/registro:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     post:
       tags: [Billetera]
-      summary: Registro de usuario DOLARA — alias + nombre + PIN (RF-13)
+      summary: Registro de usuario — alias + nombre + PIN (RF-13)
       operationId: registroUsuario
+      deprecated: true
+      security: []
       description: |
         Crea una billetera USD nueva para el alias indicado.  
-        El PIN (4–6 dígitos) se almacena como SHA-256; nunca en claro.
+        El PIN (4–6 dígitos) se almacena como hash; nunca en claro.
       requestBody:
         required: true
         content:
@@ -208,12 +413,18 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /api/v1/billetera/login:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     post:
       tags: [Billetera]
-      summary: Login de usuario DOLARA — alias + PIN (RF-13)
+      summary: Login de usuario — alias + PIN (RF-13)
       operationId: loginUsuario
+      deprecated: true
+      security: []
       description: Verifica alias y PIN; devuelve los datos de la billetera.
       requestBody:
         required: true
@@ -234,15 +445,22 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/InvalidCredentials'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /api/v1/billetera/usuarios/buscar:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     get:
       tags: [Billetera]
       summary: Buscar usuarios por alias para transferencias (RF-13)
       operationId: buscarUsuarios
+      security:
+        - UserOAuth2: [billetera/wallets.read]
+        - ServiceOAuth2: [billetera/wallets.read]
       description: |
         Búsqueda parcial por `user_id` o `nombre` (ILIKE). Retorna hasta 8 resultados.
         Mínimo 2 caracteres de búsqueda.
@@ -265,11 +483,23 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
   /api/v1/billetera/wallets:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     post:
       tags: [Billetera]
       summary: Crear billetera USD sin PIN (RF-9)
       operationId: crearBilletera
+      security:
+        - UserOAuth2: [billetera/wallets.write]
+        - ServiceOAuth2: [billetera/wallets.write]
       description: |
         Crea una billetera USD usando únicamente `user_id`.
         Para el flujo demo con PIN, usar `/registro`.
@@ -294,11 +524,23 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
-  /api/v1/billetera/wallets/by-user/{userId}:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/billetera/usuarios/{userId}/wallet:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     get:
       tags: [Billetera]
       summary: Obtener billetera por user_id / alias (RF-9)
       operationId: billeteraPorUsuario
+      security:
+        - UserOAuth2: [billetera/wallets.read]
+        - ServiceOAuth2: [billetera/wallets.read]
       parameters:
         - name: userId
           in: path
@@ -318,12 +560,26 @@ paths:
                 $ref: '#/components/schemas/Wallet'
         '404':
           $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /api/v1/billetera/wallets/{id}:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     get:
       tags: [Billetera]
       summary: Obtener billetera por UUID (RF-9)
       operationId: obtenerBilletera
+      security:
+        - UserOAuth2: [billetera/wallets.read]
+        - ServiceOAuth2: [billetera/wallets.read]
       parameters:
         - $ref: '#/components/parameters/WalletId'
       responses:
@@ -339,17 +595,33 @@ paths:
                 nombre: María Pérez
                 balance: "350.75"
                 moneda: USD
+                estado: ACTIVE
         '404':
           $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /api/v1/billetera/wallets/{id}/depositos:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     post:
       tags: [Billetera]
       summary: Depositar en billetera local (RF-10)
       operationId: depositarBilletera
+      security:
+        - UserOAuth2: [billetera/wallets.write]
+        - ServiceOAuth2: [billetera/wallets.write]
       description: |
         Acredita fondos USD en la billetera indicada.  
-        Operación atómica con `SELECT ... FOR UPDATE`.
+        Operación atómica con `SELECT ... FOR UPDATE`. Requiere estado `ACTIVE`;
+        `BLOCKED` o `CLOSED` devuelve 422 sin crear movimiento.
       parameters:
         - $ref: '#/components/parameters/WalletId'
       requestBody:
@@ -371,15 +643,29 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /api/v1/billetera/wallets/{id}/retiros:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     post:
       tags: [Billetera]
       summary: Retirar de billetera local (RF-10)
       operationId: retirarBilletera
+      security:
+        - UserOAuth2: [billetera/wallets.write]
+        - ServiceOAuth2: [billetera/wallets.write]
       description: |
         Debita fondos USD de la billetera.  
-        Devuelve 422 si el saldo es insuficiente.
+        Devuelve 422 si el saldo es insuficiente o la billetera no está `ACTIVE`.
       parameters:
         - $ref: '#/components/parameters/WalletId'
       requestBody:
@@ -404,11 +690,23 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
   /api/v1/billetera/wallets/{id}/movimientos:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     get:
       tags: [Billetera]
       summary: Historial de movimientos paginado (RF-12)
       operationId: movimientosBilletera
+      security:
+        - UserOAuth2: [billetera/wallets.read]
+        - ServiceOAuth2: [billetera/wallets.read]
       description: Devuelve el historial de movimientos USD de una billetera, ordenado por fecha descendente.
       parameters:
         - $ref: '#/components/parameters/WalletId'
@@ -423,17 +721,33 @@ paths:
                 $ref: '#/components/schemas/HistorialMovimientos'
         '404':
           $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /api/v1/billetera/transferencias:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     post:
       tags: [Billetera]
       summary: Transferir entre billeteras (atómica e idempotente) (RF-11)
       operationId: transferirBilleteras
+      security:
+        - UserOAuth2: [billetera/transferencias.write]
+        - ServiceOAuth2: [billetera/transferencias.write]
       description: |
         Transfiere USD de una billetera a otra de forma **atómica**.
         - Acepta UUID o alias (`user_id`) en `origen_id` y `destino_id`.
         - Es idempotente: reenviar la misma `Idempotency-Key` devuelve la transferencia original.
         - Usa `SELECT ... FOR UPDATE` con bloqueo ordenado por UUID para prevenir deadlocks.
+        - Origen y destino deben estar `ACTIVE`; una billetera `BLOCKED` o `CLOSED`
+          rechaza la operación completa sin débito parcial.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -465,25 +779,44 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   # ── FX ───────────────────────────────────────────────────────────────
   /api/v1/fx/tasa:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     get:
       tags: [Tipo de Cambio (FX)]
-      summary: Tasa USD/PEN vigente (RF-8)
+      summary: Tasa direccional USD/PEN o PEN/USD vigente (RF-8)
       operationId: obtenerTasa
+      security:
+        - UserOAuth2: [billetera/fx.read]
+        - ServiceOAuth2: [billetera/fx.read]
       description: |
-        Retorna la tasa de cambio USD_PEN actualmente en caché.  
-        La tasa se cachea en BD por `FX_TTL_MIN` minutos (default 60).  
-        503 si no hay tasa disponible (sin API key y caché vacía).
+        Retorna una tasa indicativa obtenida de ExchangeRate-API y cacheada en PostgreSQL.
+        `USD_PEN` devuelve la tasa directa del proveedor; `PEN_USD` devuelve su recíproco
+        redondeado a seis decimales. La caché respeta la próxima actualización informada
+        por el proveedor (24 horas en su endpoint abierto). Si la fuente falla, se devuelve
+        la última cotización con `stale: true`; responde 503 únicamente si tampoco existe caché.
+      externalDocs:
+        description: Documentación del endpoint abierto de ExchangeRate-API
+        url: https://www.exchangerate-api.com/docs/free
       parameters:
         - name: par
           in: query
           required: false
-          description: Par de monedas. Solo se soporta `USD_PEN` en v1.
+          description: Par direccional solicitado.
           schema:
             type: string
-            enum: [USD_PEN]
+            enum: [USD_PEN, PEN_USD]
             default: USD_PEN
       responses:
         '200':
@@ -494,23 +827,38 @@ paths:
                 $ref: '#/components/schemas/TasaResponse'
               example:
                 par: USD_PEN
-                tasa: "3.7200"
-                fuente: currencylayer
-                fetched_at: "2026-10-30T14:00:00.000Z"
+                tasa: "3.720000"
+                fuente: ExchangeRate-API
+                actualizada_en: "2026-11-02T00:02:31.000Z"
+                proxima_actualizacion_en: "2026-11-03T00:06:21.000Z"
+                stale: false
         '400':
           $ref: '#/components/responses/BadRequest'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
   /api/v1/fx/convertir:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
     post:
       tags: [Tipo de Cambio (FX)]
       summary: Conversión referencial USD ↔ PEN (RF-8)
       operationId: convertirDivisas
+      security:
+        - UserOAuth2: [billetera/fx.read]
+        - ServiceOAuth2: [billetera/fx.read]
       description: |
         Calcula una conversión referencial informativa entre USD y PEN.  
-        **No acredita fondos** — es solo informativo.  
-        Restricción: `de === a === PEN` se rechaza (billetera USD-only).
+        **No acredita fondos** — el saldo de la billetera permanece siempre en USD.
+        Casos soportados: USD→PEN, PEN→USD, USD→USD y PEN→PEN. Las conversiones
+        cruzadas usan la cotización externa vigente; las conversiones identidad usan tasa 1.
       requestBody:
         required: true
         content:
@@ -533,19 +881,83 @@ paths:
                 moneda_origen: USD
                 monto_convertido: "372.00"
                 moneda_destino: PEN
-                tasa: "3.7200"
+                tasa: "3.720000"
+                par: USD_PEN
+                fuente: ExchangeRate-API
+                actualizada_en: "2026-11-02T00:02:31.000Z"
+                stale: false
         '400':
           $ref: '#/components/responses/BadRequest'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
 # ─────────────────────────────────────────────────────────────────────
 # COMPONENTS
 # ─────────────────────────────────────────────────────────────────────
 components:
 
+  # ── SECURITY SCHEMES ────────────────────────────────────────────────
+  # Los dominios .example son placeholders reservados y deben sustituirse antes de producción.
+  securitySchemes:
+    UserOAuth2:
+      type: oauth2
+      description: |
+        Usuarios web/móvil mediante Authorization Code con PKCE (`S256`).
+        El cliente SPA es público y no debe tener ni almacenar un client secret.
+        La API acepta el access token en `Authorization: Bearer <token>`.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.billetera-usd.example/oauth2/authorize
+          tokenUrl: https://auth.billetera-usd.example/oauth2/token
+          scopes:
+            billetera/depositos.read: Consultar depósitos propios.
+            billetera/depositos.write: Crear depósitos propios.
+            billetera/wallets.read: Consultar billetera, usuarios y movimientos permitidos.
+            billetera/wallets.write: Crear billetera, depositar o retirar según autorización.
+            billetera/transferencias.write: Ejecutar transferencias desde la billetera autorizada.
+            billetera/fx.read: Consultar tasas y conversiones referenciales.
+      x-pkce-required: true
+      x-pkce-method: S256
+      x-token-type: access
+    ServiceOAuth2:
+      type: oauth2
+      description: |
+        Servicios backend y canales confidenciales mediante Client Credentials.
+        Cada servicio debe tener su propio client id/secret y únicamente los scopes mínimos.
+        El secreto se usa solo contra el servidor de autorización y nunca se envía a esta API.
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.billetera-usd.example/oauth2/token
+          scopes:
+            billetera/depositos.read: Consultar depósitos autorizados.
+            billetera/depositos.write: Crear depósitos desde canales autorizados.
+            billetera/wallets.read: Consultar billeteras y movimientos autorizados.
+            billetera/wallets.write: Operar billeteras autorizadas.
+            billetera/transferencias.write: Ejecutar transferencias autorizadas.
+            billetera/fx.read: Consultar tasas y conversiones referenciales.
+            billetera/sandbox.manage: Administrar solo datos de sandbox; prohibido en producción.
+      x-token-type: access
+      x-client-per-service: true
+      x-secret-storage: AWS Secrets Manager
+
   # ── PARAMETERS ───────────────────────────────────────────────────────
   parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: UUID de correlación opcional. Si falta o es inválido, la API genera uno nuevo.
+      schema:
+        type: string
+        format: uuid
+
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -554,6 +966,7 @@ components:
       schema:
         type: string
         format: uuid
+        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
       example: 550e8400-e29b-41d4-a716-446655440000
 
     DepositoId:
@@ -605,7 +1018,16 @@ components:
     # ── Requests ──
     CrearDepositoRequest:
       type: object
-      required: [cliente_id, monto, metodo_origen]
+      additionalProperties: false
+      required: [cliente_id, monto, canal, metodo_origen]
+      description: |
+        `canal` identifica dónde se originó la solicitud; `metodo_origen` identifica
+        el instrumento o rail de fondos. Son dimensiones independientes y ambas deben
+        conservarse para auditoría.
+      x-channel-method-policy:
+        VENTANILLA: [EFECTIVO]
+        AGENTE: [EFECTIVO]
+        APP: [TRANSFERENCIA, TARJETA, OTRO]
       properties:
         cliente_id:
           type: string
@@ -627,10 +1049,15 @@ components:
           enum: [USD]
           description: Solo se acepta USD. Si se omite, se asume USD.
           example: USD
+        canal:
+          type: string
+          enum: [VENTANILLA, AGENTE, APP]
+          description: Canal que recibió la instrucción; no sustituye al método de origen.
+          example: APP
         metodo_origen:
           type: string
           enum: [EFECTIVO, TRANSFERENCIA, TARJETA, OTRO]
-          description: Método por el que ingresa el efectivo.
+          description: Instrumento o rail real por el que ingresan los fondos.
           example: TRANSFERENCIA
         referencia_externa:
           type: string
@@ -641,6 +1068,7 @@ components:
 
     RegistroRequest:
       type: object
+      additionalProperties: false
       required: [user_id, nombre, pin]
       properties:
         user_id:
@@ -659,11 +1087,12 @@ components:
         pin:
           type: string
           pattern: '^\d{4,6}$'
-          description: PIN numérico de 4 a 6 dígitos. Se almacena como SHA-256.
+          description: PIN numérico de 4 a 6 dígitos. Se almacena como hash.
           example: "1234"
 
     LoginRequest:
       type: object
+      additionalProperties: false
       required: [user_id, pin]
       properties:
         user_id:
@@ -679,6 +1108,7 @@ components:
 
     CrearWalletRequest:
       type: object
+      additionalProperties: false
       required: [user_id]
       properties:
         user_id:
@@ -696,6 +1126,7 @@ components:
 
     MontoRequest:
       type: object
+      additionalProperties: false
       required: [monto]
       properties:
         monto:
@@ -703,6 +1134,7 @@ components:
 
     TransferenciaRequest:
       type: object
+      additionalProperties: false
       required: [origen_id, destino_id, monto]
       properties:
         origen_id:
@@ -722,6 +1154,7 @@ components:
 
     ConvertirRequest:
       type: object
+      additionalProperties: false
       required: [monto, de, a]
       properties:
         monto:
@@ -740,6 +1173,8 @@ components:
     # ── Responses ──
     Deposito:
       type: object
+      additionalProperties: false
+      required: [deposito_id, cliente_id, monto, moneda, canal, metodo_origen, estado, creado_en]
       properties:
         deposito_id:
           type: string
@@ -758,6 +1193,14 @@ components:
           type: string
           enum: [USD]
           example: USD
+        canal:
+          type: string
+          enum: [VENTANILLA, AGENTE, APP]
+          example: APP
+        metodo_origen:
+          type: string
+          enum: [EFECTIVO, TRANSFERENCIA, TARJETA, OTRO]
+          example: TRANSFERENCIA
         estado:
           type: string
           enum: [PENDIENTE, VALIDADO, COMPLETADO, FALLIDO]
@@ -778,6 +1221,8 @@ components:
 
     HistorialDepositos:
       type: object
+      additionalProperties: false
+      required: [items, page, limit, total, correlation_id]
       properties:
         items:
           type: array
@@ -813,6 +1258,8 @@ components:
 
     Wallet:
       type: object
+      additionalProperties: false
+      required: [id, user_id, nombre, balance, moneda, estado]
       properties:
         id:
           type: string
@@ -834,9 +1281,19 @@ components:
           type: string
           enum: [USD]
           example: USD
+        estado:
+          type: string
+          enum: [ACTIVE, BLOCKED, CLOSED]
+          description: |
+            Estado operativo de la billetera. `BLOCKED` impide operaciones monetarias;
+            `CLOSED` es terminal y tampoco acepta créditos. Las consultas autorizadas
+            pueden seguir disponibles para auditoría.
+          example: ACTIVE
 
     OperacionResult:
       type: object
+      additionalProperties: false
+      required: [movimiento_id, balance, moneda]
       description: Resultado de una operación de depósito o retiro en billetera.
       properties:
         movimiento_id:
@@ -853,6 +1310,8 @@ components:
 
     TransferenciaResult:
       type: object
+      additionalProperties: false
+      required: [referencia, origen_balance, destino_balance, moneda, replay]
       properties:
         referencia:
           type: string
@@ -874,6 +1333,8 @@ components:
 
     BuscarUsuariosResponse:
       type: object
+      additionalProperties: false
+      required: [items]
       properties:
         items:
           type: array
@@ -899,6 +1360,8 @@ components:
 
     HistorialMovimientos:
       type: object
+      additionalProperties: false
+      required: [items, page, limit, total, moneda]
       properties:
         items:
           type: array
@@ -920,6 +1383,8 @@ components:
 
     Movimiento:
       type: object
+      additionalProperties: false
+      required: [id, tipo, monto, moneda, saldo_resultante, referencia, creado_en]
       properties:
         id:
           type: string
@@ -948,27 +1413,41 @@ components:
 
     TasaResponse:
       type: object
+      additionalProperties: false
+      required: [par, tasa, fuente, actualizada_en, proxima_actualizacion_en, stale]
       properties:
         par:
           type: string
-          enum: [USD_PEN]
+          enum: [USD_PEN, PEN_USD]
           example: USD_PEN
         tasa:
           type: string
-          description: Tasa de cambio con 4 decimales.
-          example: "3.7200"
+          description: Tasa de cambio con 6 decimales.
+          example: "3.720000"
         fuente:
           type: string
-          description: Fuente de la tasa (currencylayer, static-fallback, etc.).
-          example: currencylayer
-        fetched_at:
+          description: Proveedor externo de la tasa.
+          example: ExchangeRate-API
+        actualizada_en:
           type: string
           format: date-time
-          description: Timestamp en que se obtuvo la tasa.
-          example: "2026-10-30T14:00:00.000Z"
+          description: Timestamp de actualización de la cotización informado por el proveedor.
+          example: "2026-11-02T00:02:31.000Z"
+        proxima_actualizacion_en:
+          type: string
+          format: date-time
+          nullable: true
+          description: Próxima actualización anunciada por el proveedor; null para caché histórica sin ese metadato.
+          example: "2026-11-03T00:06:21.000Z"
+        stale:
+          type: boolean
+          description: true cuando se devuelve una tasa vencida porque la fuente externa no respondió.
+          example: false
 
     ConvertirResponse:
       type: object
+      additionalProperties: false
+      required: [monto_origen, moneda_origen, monto_convertido, moneda_destino, tasa, par]
       properties:
         monto_origen:
           $ref: '#/components/schemas/Monto'
@@ -984,11 +1463,28 @@ components:
           example: PEN
         tasa:
           type: string
-          description: Tasa utilizada en la conversión.
-          example: "3.7200"
+          description: Tasa direccional utilizada; para PEN→USD es el recíproco de USD→PEN.
+          example: "3.720000"
+        par:
+          type: string
+          enum: [USD_PEN, PEN_USD, USD_USD, PEN_PEN]
+          example: USD_PEN
+        fuente:
+          type: string
+          description: Proveedor externo; se omite en conversiones identidad.
+          example: ExchangeRate-API
+        actualizada_en:
+          type: string
+          format: date-time
+          description: Actualización de la cotización externa; se omite en conversiones identidad.
+        stale:
+          type: boolean
+          description: Indica si se usó la última cotización disponible por una falla del proveedor.
 
     LiveResponse:
       type: object
+      additionalProperties: false
+      required: [status]
       properties:
         status:
           type: string
@@ -997,6 +1493,8 @@ components:
 
     ReadyResponse:
       type: object
+      additionalProperties: false
+      required: [status, db, fakes]
       properties:
         status:
           type: string
@@ -1021,6 +1519,8 @@ components:
     # ── Errors ──
     ApiError:
       type: object
+      additionalProperties: false
+      required: [status, code, message, correlation_id, timestamp]
       description: Formato estándar de error para todos los endpoints.
       properties:
         status:
@@ -1044,6 +1544,19 @@ components:
           type: string
           format: date-time
           example: "2026-10-30T20:00:00.000Z"
+        retryable:
+          type: boolean
+          description: Indica si el cliente puede reintentar respetando idempotencia y `Retry-After`.
+          example: false
+        resource_id:
+          type: string
+          nullable: true
+          description: Identificador de la operación persistida cuando el resultado externo es ambiguo.
+        resource_url:
+          type: string
+          format: uri-reference
+          nullable: true
+          description: URL para consultar el estado definitivo de una operación persistida.
 
   # ── RESPONSES ────────────────────────────────────────────────────────
   responses:
@@ -1061,9 +1574,27 @@ components:
             message: Idempotency-Key obligatorio
             correlation_id: 550e8400-e29b-41d4-a716-446655440000
             timestamp: "2026-10-30T15:00:00.000Z"
-
     Unauthorized:
-      description: PIN incorrecto.
+      description: Access token ausente, inválido, expirado o de tipo incorrecto.
+      headers:
+        WWW-Authenticate:
+          description: Desafío Bearer conforme a OAuth 2.0.
+          schema:
+            type: string
+          example: 'Bearer realm="billetera-usd", error="invalid_token"'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            status: 401
+            code: UNAUTHORIZED
+            message: access token ausente o inválido
+            correlation_id: 550e8400-e29b-41d4-a716-446655440001
+            timestamp: "2026-11-06T15:00:00.000Z"
+
+    InvalidCredentials:
+      description: Credenciales del flujo demo incorrectas.
       content:
         application/json:
           schema:
@@ -1072,8 +1603,27 @@ components:
             status: 401
             code: PIN_INCORRECTO
             message: PIN incorrecto
-            correlation_id: 550e8400-e29b-41d4-a716-446655440001
-            timestamp: "2026-10-30T15:00:00.000Z"
+            correlation_id: 550e8400-e29b-41d4-a716-446655440010
+            timestamp: "2026-11-06T15:00:00.000Z"
+
+    Forbidden:
+      description: Token válido, pero sin el scope requerido o sin acceso al recurso solicitado.
+      headers:
+        WWW-Authenticate:
+          description: Scope requerido cuando el rechazo se debe a autorización insuficiente.
+          schema:
+            type: string
+          example: 'Bearer error="insufficient_scope", scope="billetera/wallets.read"'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            status: 403
+            code: INSUFFICIENT_SCOPE
+            message: el token no posee el scope requerido
+            correlation_id: 550e8400-e29b-41d4-a716-446655440007
+            timestamp: "2026-11-06T15:00:00.000Z"
 
     NotFound:
       description: Recurso no encontrado. Código `NOT_FOUND` o `NO_ENCONTRADA`.
@@ -1087,7 +1637,6 @@ components:
             message: depósito no existe
             correlation_id: 550e8400-e29b-41d4-a716-446655440002
             timestamp: "2026-10-30T15:00:00.000Z"
-
     Conflict:
       description: Recurso ya existe. Código `YA_EXISTE`.
       content:
@@ -1101,8 +1650,23 @@ components:
             correlation_id: 550e8400-e29b-41d4-a716-446655440003
             timestamp: "2026-10-30T15:00:00.000Z"
 
+    IdempotencyConflict:
+      description: La misma Idempotency-Key fue usada con un payload diferente.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            status: 409
+            code: IDEMPOTENCY_CONFLICT
+            message: misma clave con datos diferentes
+            correlation_id: 550e8400-e29b-41d4-a716-446655440006
+            timestamp: "2026-10-30T15:00:00.000Z"
+
     UnprocessableEntity:
-      description: Regla de negocio violada. Código `FONDOS_INSUFICIENTES`.
+      description: |
+        Regla de negocio violada. Códigos posibles: `FONDOS_INSUFICIENTES`,
+        `CUSTOMER_BLOCKED`, `USD_ACCOUNT_NOT_ENABLED`, `WALLET_BLOCKED`, `WALLET_CLOSED`.
       content:
         application/json:
           schema:
@@ -1114,8 +1678,53 @@ components:
             correlation_id: 550e8400-e29b-41d4-a716-446655440004
             timestamp: "2026-10-30T15:00:00.000Z"
 
+    TooManyRequests:
+      description: Límite de solicitudes excedido. El cliente debe respetar `Retry-After`.
+      headers:
+        Retry-After:
+          description: Segundos antes del próximo intento.
+          schema:
+            type: integer
+            minimum: 1
+          example: 30
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            status: 429
+            code: RATE_LIMITED
+            message: demasiadas solicitudes
+            correlation_id: 550e8400-e29b-41d4-a716-446655440008
+            timestamp: "2026-11-06T15:00:00.000Z"
+
+    BadGateway:
+      description: |
+        La dependencia respondió, pero su payload o estado no cumple el contrato.
+        Códigos: `BALANCE_INVALID_RESPONSE`, `BALANCE_UNEXPECTED_STATE`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            status: 502
+            code: BALANCE_UNEXPECTED_STATE
+            message: Saldos devolvió un estado no reconocido
+            correlation_id: 550e8400-e29b-41d4-a716-446655440009
+            timestamp: "2026-11-06T15:00:00.000Z"
+            retryable: true
+            resource_id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+            resource_url: /api/v1/depositos/usd/3fa85f64-5717-4562-b3fc-2c963f66afa6
+
     ServiceUnavailable:
-      description: Servicio externo no disponible (ej. tasa FX no cargada).
+      description: Timeout, error de red o dependencia temporalmente no disponible.
+      headers:
+        Retry-After:
+          description: Segundos sugeridos antes de reintentar, cuando sea seguro hacerlo.
+          schema:
+            type: integer
+            minimum: 1
+          example: 10
       content:
         application/json:
           schema:

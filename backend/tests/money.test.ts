@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { add, sub, gte, convertir, toCents, fromCents } from '../src/money.js';
+import { add, sub, gte, convertir, tasaInversa, toCents, fromCents } from '../src/money.js';
 
 describe('money', () => {
   it('suma y resta con centavos exactos', () => {
@@ -17,6 +17,10 @@ describe('money', () => {
   it('convierte PEN->USD', () => {
     // 344.65 / 3.446502 ≈ 100.00
     expect(convertir('344.65', '3.446502', true)).toBe('100.00');
+  });
+
+  it('calcula la tasa direccional PEN->USD a 6 decimales', () => {
+    expect(tasaInversa('3.500000')).toBe('0.285714');
   });
 
   it('redondeo half-up hacia arriba', () => {

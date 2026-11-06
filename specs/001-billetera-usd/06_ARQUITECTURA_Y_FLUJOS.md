@@ -9,7 +9,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  DOLARA — Tu billetera en dólares · 100% USD            │
+│  Billetera Digital USD — Tu billetera en dólares · 100% USD            │
 │  SPA móvil (Angular) + API (Express) + Postgres          │
 │  Dinero: string "150.50" · NUMERIC(18,2) · cero floats   │
 │  Regla de oro: nada persiste ni acredita en PEN          │
@@ -21,8 +21,8 @@
 | ¿Dónde está la arquitectura original? | `01_SDD_… §3 principios, §7 hexagonal, §8 dominio, §10 persistencia, §9 flujo, §13 idempotencia` |
 | ¿Dónde están los contratos? | `02_CONTRATOS_…` + `plan.md §4` + Swagger `GET /docs` |
 | ¿Dónde está el CÓMO implementado? | `plan.md` + este doc + `backend/src` |
-| ¿Qué es core de clase vs propio? | Core: `depositos_usd` (saldo externo). Propio DOLARA: `wallets` + FX referencial. Separados (C11) |
-| ¿Cómo lo corro? | `docker compose up -d --build` → web `:4200` · api `:3001` · db host `:5433` |
+| ¿Qué es core de clase vs propio? | Core: `depositos_usd` (saldo externo). Propio Billetera Digital USD: `wallets` + FX referencial. Separados (C11) |
+| ¿Cómo lo corro? | `docker compose up -d --build` → web `:4200` · api `:3001` · db host `:5434` |
 
 ---
 
@@ -30,8 +30,8 @@
 
 ```mermaid
 flowchart LR
-  U[👤 Usuario<br/>SPA DOLARA :4200] --> API[🟩 API DOLARA :3001<br/>Express + /docs]
-  API --> DB[(🟦 Postgres :5433<br/>depositos_usd<br/>wallets / movs<br/>fx_rates)]
+  U[👤 Usuario<br/>SPA Billetera Digital USD :4200] --> API[🟩 API Billetera Digital USD :3001<br/>Express + /docs]
+  API --> DB[(🟦 Postgres :5434<br/>depositos_usd<br/>wallets / movs<br/>fx_rates)]
   API -.->|Etapa A: fakes| FAKE[🎭 Fakes<br/>A=USD B=Bloq C=PEN]
   API -.->|Etapa B/C: HTTP<br/>timeout 3s| EXT[🏦 MS Clientes :3002<br/>MS Saldos :3003]
   API --> FX[💱 exchangerate.host<br/>live source=USD<br/>caché 60min]
@@ -39,7 +39,7 @@ flowchart LR
 
 ```text
                     ┌──────────────┐
-                    │   DOLARA SPA │  :4200  (nginx → /api → ms-depositos-usd:3001)
+                    │   Billetera Digital USD SPA │  :4200  (nginx → /api → ms-depositos-usd:3001)
                     │ 6 pantallas  │
                     └──────┬───────┘
                            │ REST /api/v1 + Idempotency-Key + X-Correlation-Id
@@ -54,7 +54,7 @@ flowchart LR
               ▼            ▼            ▼
         ┌──────────┐ ┌──────────┐ ┌──────────┐
         │ Postgres │ │ Clientes │ │  Saldos  │   Etapa A = fakes
-        │  :5433   │ │  :3002   │ │  :3003   │   (ledger fake_ledger)
+        │  :5434   │ │  :3002   │ │  :3003   │   (ledger fake_ledger)
         └──────────┘ └──────────┘ └──────────┘
 ```
 
@@ -148,7 +148,7 @@ erDiagram
 
 ```
 depositos_usd  = recargas auditadas (externo)  · moneda USD CHECK (aislado de wallets)
-wallets        = saldo propio DOLARA           · moneda USD CHECK (v2/v3)
+wallets        = saldo propio Billetera Digital USD           · moneda USD CHECK (v2/v3)
 billetera_mov  = movimientos inmutables        · solo INSERT, jamás UPDATE/DELETE
 fx_rates       = caché tasa                    · 1 fila USD_PEN (exchangerate.host)
 fake_ledger    = idempotencia fake             · se desecha en Etapa B/C
@@ -231,10 +231,10 @@ Formato siempre: `{status, code, message, correlation_id, timestamp}` + header `
 
 ---
 
-## 7. Frontend DOLARA: 6 pantallas banca móvil
+## 7. Frontend Billetera Digital USD: 6 pantallas banca móvil
 
 ```
-            ┌────────── TOPBAR DOLARA ($ + USD ● $) ──────────┐
+            ┌────────── TOPBAR Billetera Digital USD ($ + USD ● $) ──────────┐
             │  hero saldo USD · chip USD-only · T.C. ref · 👁  │
             │  [💵 Recargar] [🏧 Retirar] [🔀 Transferir] [💱]  │
             └─────────────────────────────────────────────────┘
@@ -245,7 +245,7 @@ Formato siempre: `{status, code, message, correlation_id, timestamp}` + header `
 
 | Ruta | Qué hace | API |
 |------|----------|-----|
-| `/inicio` | Saldo + crear/cargar wallet (UUID o user_id con fallback `by-user`) + últimos 5 movs | `GET billetera/:id` → fallback `GET billetera/by-user/:userId`, `movimientos`, `tasa` |
+| `/inicio` | Saldo + crear/cargar wallet (UUID o user_id) + últimos 5 movs | `GET billetera/wallets/:id` → fallback `GET billetera/usuarios/:userId/wallet`, `movimientos`, `tasa` |
 | `/billetera` | Recargar / retirar con validación `0.00` | `POST :id/depositos`, `:id/retiros` |
 | `/transferir` | Origen→destino atómica | `POST transferencias` + key auto |
 | `/depositar` | Depósito auditado con voucher | `POST depositos/usd` + key auto |
@@ -267,7 +267,7 @@ Archivos: `frontend/src/app/api.service.ts` (único servicio), `app.routes.ts`, 
 | RF-9..RF-12 | `routes/billetera.ts` (v2 `add/sub/gte` + `moneda USD`), `db.ts` v2 | `billetera.test` |
 | RF-13 (v3 acceso demo) | `routes/billetera.ts /registro /login /usuarios/buscar`, `db.ts` v3 (`nombre/pin_hash`), `fakes.ts` acepta wallets registradas, `auth.service.ts` + `auth.guard.ts` + `/acceso` | suite 37/37 + `ng build` + manual alias+PIN |
 | v2 USD-only | `validators.monedaUsdSchema`, `fx PEN→PEN 400` | `tsc` + curl manual + `money/domain 10/10` |
-| SPA DOLARA | `frontend/src/app/**` (v3: sesión, sidebar desktop ≥960px, tabbar solo móvil) | `ng build` + manual 7 rutas |
+| SPA Billetera Digital USD | `frontend/src/app/**` (v3: sesión, sidebar desktop ≥960px, tabbar solo móvil) | `ng build` + manual 7 rutas |
 
 ---
 
@@ -288,7 +288,7 @@ Nuevo endpoint documentado        → backend/src/routes/*.ts (@openapi) → vis
 Diagrama ASCII para terminal (sin mermaid):
 
 ```
-[SPA :4200] --/api/v1--> [Express :3001] --SQL--> [PG :5433]
+[SPA :4200] --/api/v1--> [Express :3001] --SQL--> [PG :5434]
                               |--ports--> [fakes|A]  (USE_FAKES=true)
                               |--http---> [clientes:3002 saldos:3003] (B/C)
                               |--fetch--> [exchangerate.host] (FX 60min caché)

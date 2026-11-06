@@ -10,12 +10,12 @@ import { FxComponent } from './pages/fx.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'inicio', pathMatch: 'full' },
-  { path: 'acceso', component: AccesoComponent, title: 'DOLARA · Acceso demo' },
-  { path: 'inicio', component: DashboardComponent, canActivate: [authGuard], title: 'DOLARA · Inicio' },
-  { path: 'billetera', component: BilleteraComponent, canActivate: [authGuard], title: 'DOLARA · Mi billetera' },
-  { path: 'transferir', component: TransferirComponent, canActivate: [authGuard], title: 'DOLARA · Transferir' },
-  { path: 'depositar', component: DepositarComponent, canActivate: [authGuard], title: 'DOLARA · Recargar USD' },
-  { path: 'historial', component: HistorialComponent, canActivate: [authGuard], title: 'DOLARA · Movimientos' },
-  { path: 'fx', component: FxComponent, canActivate: [authGuard], title: 'DOLARA · Tipo de cambio' },
+  { path: 'acceso', component: AccesoComponent, title: 'Billetera Digital USD · Acceso demo' },
+  { path: 'inicio', component: DashboardComponent, canActivate: [authGuard], title: 'Billetera Digital USD · Inicio' },
+  { path: 'billetera', component: BilleteraComponent, canActivate: [authGuard], title: 'Billetera Digital USD · Mi billetera' },
+  { path: 'transferir', component: TransferirComponent, canActivate: [authGuard], title: 'Billetera Digital USD · Transferir' },
+  { path: 'depositar', component: DepositarComponent, canActivate: [authGuard], title: 'Billetera Digital USD · Recargar USD' },
+  { path: 'historial', component: HistorialComponent, canActivate: [authGuard], title: 'Billetera Digital USD · Movimientos' },
+  { path: 'fx', component: FxComponent, canActivate: [authGuard], title: 'Billetera Digital USD · Tipo de cambio' },
   { path: '**', redirectTo: 'inicio' },
 ];

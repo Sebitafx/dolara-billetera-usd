@@ -76,9 +76,28 @@ describe('api billetera local (C11)', () => {
     const r2 = await request(app).post('/api/v1/billetera/transferencias').set('Idempotency-Key', key).send(body);
     expect(r2.status).toBe(200);
     expect(r2.body.replay).toBe(true);
+    expect(r2.body.origen_balance).toBe('50.00');
+    expect(r2.body.destino_balance).toBe('20.00');
+
+    const conflicto = await request(app)
+      .post('/api/v1/billetera/transferencias')
+      .set('Idempotency-Key', key)
+      .send({ ...body, monto: '21.00' });
+    expect(conflicto.status).toBe(409);
+    expect(conflicto.body.code).toBe('IDEMPOTENCY_CONFLICT');
+
+    const posterior = await request(app)
+      .post('/api/v1/billetera/transferencias')
+      .set('Idempotency-Key', randomUUID())
+      .send({ ...body, monto: '5.00' });
+    expect(posterior.status).toBe(201);
+
+    const replayOriginal = await request(app).post('/api/v1/billetera/transferencias').set('Idempotency-Key', key).send(body);
+    expect(replayOriginal.body.origen_balance).toBe('50.00');
+    expect(replayOriginal.body.destino_balance).toBe('20.00');
 
     const g = await request(app).get(`/api/v1/billetera/wallets/${aId}`);
-    expect(g.body.balance).toBe('50.00');
+    expect(g.body.balance).toBe('45.00');
 
     const pobre = await request(app)
       .post('/api/v1/billetera/transferencias')

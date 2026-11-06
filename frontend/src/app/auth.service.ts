@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { tap } from 'rxjs';
 import { ApiService, Wallet } from './api.service';
 
-const KEY = 'dolara_session';
+const KEY = 'billetera_digital_usd_session';
 
 export interface Sesion extends Wallet {}
 
@@ -29,7 +29,7 @@ export class AuthService {
   private guardar(w: Wallet) {
     const s: Sesion = { ...w };
     localStorage.setItem(KEY, JSON.stringify(s));
-    localStorage.setItem('dolara_wallet', w.id); // compat con pantallas antiguas
+    localStorage.setItem('billetera_digital_usd_wallet', w.id);
     this._sesion.set(s);
   }
 
@@ -50,7 +50,7 @@ export class AuthService {
 
   salir() {
     localStorage.removeItem(KEY);
-    localStorage.removeItem('dolara_wallet');
+    localStorage.removeItem('billetera_digital_usd_wallet');
     this._sesion.set(null);
     this.router.navigateByUrl('/acceso');
   }

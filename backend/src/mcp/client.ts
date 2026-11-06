@@ -90,11 +90,11 @@ export class SandboxHttpClient {
   }
 
   async consultarSaldo(identificador: string) {
-    // Si parece UUID va a /wallets/:id, sino a /wallets/by-user/:userId
+    // Si parece UUID consulta por id; en caso contrario consulta por user_id.
     const esUuid = /^[0-9a-f-]{36}$/i.test(identificador);
     const path = esUuid
       ? `/api/v1/billetera/wallets/${encodeURIComponent(identificador)}`
-      : `/api/v1/billetera/wallets/by-user/${encodeURIComponent(identificador)}`;
+      : `/api/v1/billetera/usuarios/${encodeURIComponent(identificador)}/wallet`;
     return this.request<Record<string, unknown>>(path, { method: 'GET' });
   }
 

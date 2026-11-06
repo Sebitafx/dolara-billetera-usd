@@ -45,7 +45,7 @@ Integración por puertos, no por URLs (contrato de la clase): Clientes/Cuentas y
 
 ## C10
 
-Convenciones de la clase: base path `/api/v1`, dinero como string `"150.50"`, errores `{ status, code, message, correlation_id, timestamp }`, health `/health/live` + `/health/ready`, correlación `X-Correlation-Id`, puerto 3001 (DB host 5433).
+Convenciones de la clase: base path `/api/v1`, dinero como string `"150.50"`, errores `{ status, code, message, correlation_id, timestamp }`, health `/health/live` + `/health/ready`, correlación `X-Correlation-Id`, puerto 3001 (DB host 5434).
 
 ## C11
 

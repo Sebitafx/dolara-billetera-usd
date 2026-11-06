@@ -1,4 +1,4 @@
-' DOLARA — Arquitectura del sistema (v3, USD-only) · versión breve
+' Billetera Digital USD — Arquitectura del sistema (v3, USD-only) · versión breve
 ' Cómo verlo: extensión PlantUML en VS Code, o pegar en https://www.plantuml.com/plantuml/uml/
 ' Detalle completo: specs/001-billetera-usd/06_ARQUITECTURA_Y_FLUJOS.md
 
@@ -10,9 +10,9 @@ actor "👤 Usuario" as U
 node "Docker · wallet-network" as DC {
   component "📱 SPA Angular :4200\nacceso · inicio · billetera\ntransferir · historial · fx" as SPA
   component "🟩 API Express :3001\ndeposits · billetera · fx\nhexagonal (puertos/adapt.)" as API
-  database "🟦 Postgres 16 :5433\ndepositos_usd · wallets\nmovimientos · fx_rates" as DB
+  database "🟦 Postgres 16 :5434\ndepositos_usd · wallets\nmovimientos · fx_rates" as DB
 }
-cloud "💱 exchangerate.host" as FX
+cloud "💱 ExchangeRate-API\nopen.er-api.com" as FX
 node "🏦 Clientes/Saldos\n(Etapa A: fakes)" as EXT
 
 U --> SPA : "alias + PIN"

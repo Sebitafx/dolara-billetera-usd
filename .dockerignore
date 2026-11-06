@@ -1,0 +1,14 @@
+*
+!backend/
+!backend/package.json
+!backend/package-lock.json
+!backend/tsconfig.json
+!backend/vitest.config.ts
+!backend/src/
+!backend/src/**
+!docs/
+!docs/openapi.yaml
+!specs/
+!specs/002-mcp-dolara/
+!specs/002-mcp-dolara/contracts/
+!specs/002-mcp-dolara/contracts/**

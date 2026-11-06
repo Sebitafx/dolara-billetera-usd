@@ -1,25 +1,38 @@
 import { Router } from 'express';
-import { createHash, randomUUID } from 'crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import { pool } from '../db.js';
 import { apiError } from '../errors.js';
-import { montoSchema, paginationSchema } from '../validators.js';
+import {
+  crearWalletSchema,
+  idempotencyKeySchema,
+  loginSchema,
+  montoRequestSchema,
+  paginationSchema,
+  registroSchema,
+  transferenciaSchema,
+  uuidSchema,
+  walletOwnerIdSchema,
+} from '../validators.js';
 import { add, sub, gte } from '../money.js';
-import { z } from 'zod';
 
 export const billetera = Router();
 
-// Acceso demo DOLARA (sin auth real, C3/S-8): alias + nombre + PIN 4 dígitos.
+// Acceso demo de Billetera Digital USD (sin auth real): alias + nombre + PIN.
 // El PIN se guarda como SHA-256, nunca en claro. Formularios mínimos para demo.
-const aliasSchema = z
-  .string()
-  .min(3)
-  .max(30)
-  .regex(/^[a-z0-9][a-z0-9_-]*$/, 'alias inválido (minúsculas, números, - _)');
-const nombreSchema = z.string().min(2).max(60);
-const pinSchema = z.string().regex(/^\d{4,6}$/, 'PIN de 4 a 6 dígitos');
-
 function pinHash(pin: string): string {
-  return createHash('sha256').update(`dolara-demo:${pin}`).digest('hex');
+  return createHash('sha256').update(`billetera-digital-usd-demo:${pin}`).digest('hex');
+}
+
+function legacyPinHash(pin: string): string {
+  const legacyPrefix = Buffer.from('ZG9sYXJhLWRlbW86', 'base64').toString('utf8');
+  return createHash('sha256').update(`${legacyPrefix}${pin}`).digest('hex');
+}
+
+function sameHash(a: string, b: string): boolean {
+  if (!/^[0-9a-f]{64}$/i.test(a) || !/^[0-9a-f]{64}$/i.test(b)) return false;
+  const left = Buffer.from(a, 'hex');
+  const right = Buffer.from(b, 'hex');
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 function walletDTO(w: Record<string, unknown>) {
@@ -33,28 +46,20 @@ function walletDTO(w: Record<string, unknown>) {
 }
 
 async function resolverWalletId(ref: string): Promise<string | null> {
-  // Acepta UUID directo o alias (user_id) para no pegar UUIDs a mano.
-  if (/^[0-9a-f-]{36}$/i.test(ref)) return ref;
+  if (uuidSchema.safeParse(ref).success) return ref;
   const { rows } = await pool.query(`SELECT id FROM wallets WHERE user_id = $1`, [ref]);
   return rows.length > 0 ? (rows[0].id as string) : null;
 }
-
-const transferenciaSchema = z.object({
-  origen_id: z.string().min(1).max(100),
-  destino_id: z.string().min(1).max(100),
-  monto: montoSchema,
-});
 
 /**
  * @openapi
  * /api/v1/billetera/wallets:
  *   post:
- *     summary: Crea billetera USD (RF-9, DOLARA v2 USD-only)
+ *     summary: Crea billetera USD (RF-9)
  */
 billetera.post('/wallets', async (req, res, next) => {
   try {
-    const user_id = z.string().min(1).max(100).parse(req.body?.user_id);
-    const nombre = typeof req.body?.nombre === 'string' && req.body.nombre.trim() ? req.body.nombre.trim().slice(0, 60) : null;
+    const { user_id, nombre = null } = crearWalletSchema.parse(req.body);
     const { rows } = await pool.query(
       `INSERT INTO wallets (user_id, nombre, moneda) VALUES ($1, $2, 'USD') RETURNING id, user_id, nombre, balance, moneda`,
       [user_id, nombre],
@@ -64,7 +69,6 @@ billetera.post('/wallets', async (req, res, next) => {
     if (typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '23505') {
       return next(apiError(409, 'YA_EXISTE', 'billetera ya existe'));
     }
-    if (e instanceof Error && e.name === 'ZodError') return next(apiError(400, 'VALIDATION_ERROR', 'user_id inválido'));
     next(e);
   }
 });
@@ -73,24 +77,21 @@ billetera.post('/wallets', async (req, res, next) => {
  * @openapi
  * /api/v1/billetera/registro:
  *   post:
- *     summary: Registro demo DOLARA — alias + nombre + PIN (RF-13)
+ *     summary: Registro demo — alias + nombre + PIN (RF-13)
  */
 billetera.post('/registro', async (req, res, next) => {
   try {
-    const { user_id, nombre, pin } = z
-      .object({ user_id: aliasSchema, nombre: nombreSchema, pin: pinSchema })
-      .parse(req.body);
+    const { user_id, nombre, pin } = registroSchema.parse(req.body);
     const { rows } = await pool.query(
       `INSERT INTO wallets (user_id, nombre, pin_hash, moneda) VALUES ($1, $2, $3, 'USD')
        RETURNING id, user_id, nombre, balance, moneda`,
-      [user_id.toLowerCase(), nombre.trim(), pinHash(pin)],
+      [user_id, nombre, pinHash(pin)],
     );
     res.status(201).json(walletDTO(rows[0]));
   } catch (e: unknown) {
     if (typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '23505') {
       return next(apiError(409, 'YA_EXISTE', 'ese alias ya está registrado, inicia sesión'));
     }
-    if (e instanceof Error && e.name === 'ZodError') return next(apiError(400, 'VALIDATION_ERROR', 'revisa alias, nombre y PIN (4-6 dígitos)'));
     next(e);
   }
 });
@@ -99,25 +100,29 @@ billetera.post('/registro', async (req, res, next) => {
  * @openapi
  * /api/v1/billetera/login:
  *   post:
- *     summary: Login demo DOLARA — alias + PIN (RF-13)
+ *     summary: Login demo — alias + PIN (RF-13)
  */
 billetera.post('/login', async (req, res, next) => {
   try {
-    const { user_id, pin } = z.object({ user_id: aliasSchema, pin: pinSchema }).parse(req.body);
+    const { user_id, pin } = loginSchema.parse(req.body);
     const { rows } = await pool.query(`SELECT id, user_id, nombre, balance, moneda, pin_hash FROM wallets WHERE user_id = $1`, [
-      user_id.toLowerCase(),
+      user_id,
     ]);
     if (rows.length === 0) return next(apiError(404, 'NO_ENCONTRADA', 'alias no registrado'));
     const w = rows[0];
+    const currentHash = pinHash(pin);
     if (!w.pin_hash) {
       // Billetera legacy sin PIN: lo fija en el primer login demo.
-      await pool.query(`UPDATE wallets SET pin_hash = $1 WHERE id = $2`, [pinHash(pin), w.id]);
-    } else if (w.pin_hash !== pinHash(pin)) {
-      return next(apiError(401, 'PIN_INCORRECTO', 'PIN incorrecto'));
+      await pool.query(`UPDATE wallets SET pin_hash = $1 WHERE id = $2`, [currentHash, w.id]);
+    } else if (!sameHash(String(w.pin_hash), currentHash)) {
+      if (sameHash(String(w.pin_hash), legacyPinHash(pin))) {
+        await pool.query(`UPDATE wallets SET pin_hash = $1 WHERE id = $2`, [currentHash, w.id]);
+      } else {
+        return next(apiError(401, 'PIN_INCORRECTO', 'PIN incorrecto'));
+      }
     }
     res.json(walletDTO(w));
   } catch (e) {
-    if (e instanceof Error && e.name === 'ZodError') return next(apiError(400, 'VALIDATION_ERROR', 'revisa alias y PIN'));
     next(e);
   }
 });
@@ -144,14 +149,15 @@ billetera.get('/usuarios/buscar', async (req, res, next) => {
 
 /**
  * @openapi
- * /api/v1/billetera/wallets/by-user/{userId}:
+ * /api/v1/billetera/usuarios/{userId}/wallet:
  *   get:
- *     summary: Busca billetera USD por user_id (DOLARA UX, RF-9)
+ *     summary: Busca billetera USD por user_id (RF-9)
  */
-billetera.get('/wallets/by-user/:userId', async (req, res, next) => {
+billetera.get('/usuarios/:userId/wallet', async (req, res, next) => {
   try {
+    const userId = walletOwnerIdSchema.parse(req.params.userId);
     const { rows } = await pool.query(`SELECT id, user_id, nombre, balance, moneda FROM wallets WHERE user_id = $1`, [
-      req.params.userId,
+      userId,
     ]);
     if (rows.length === 0) return next(apiError(404, 'NO_ENCONTRADA', 'billetera no encontrada'));
     res.json(walletDTO(rows[0]));
@@ -168,7 +174,8 @@ billetera.get('/wallets/by-user/:userId', async (req, res, next) => {
  */
 billetera.get('/wallets/:id', async (req, res, next) => {
   try {
-    const { rows } = await pool.query(`SELECT id, user_id, nombre, balance, moneda FROM wallets WHERE id = $1`, [req.params.id]);
+    const id = uuidSchema.parse(req.params.id);
+    const { rows } = await pool.query(`SELECT id, user_id, nombre, balance, moneda FROM wallets WHERE id = $1`, [id]);
     if (rows.length === 0) return next(apiError(404, 'NO_ENCONTRADA', 'billetera no encontrada'));
     res.json(walletDTO(rows[0]));
   } catch (e) {
@@ -209,8 +216,10 @@ async function operar(walletId: string, monto: string, tipo: 'deposito' | 'retir
  */
 billetera.post('/wallets/:id/depositos', async (req, res, next) => {
   try {
-    const monto = montoSchema.parse(req.body?.monto);
-    res.status(201).json(await operar(req.params.id, monto, 'deposito'));
+    const idResult = uuidSchema.safeParse(req.params.id);
+    if (!idResult.success) return next(apiError(400, 'VALIDATION_ERROR', 'id de billetera inválido'));
+    const { monto } = montoRequestSchema.parse(req.body);
+    res.status(201).json(await operar(idResult.data, monto, 'deposito'));
   } catch (e) {
     if (e instanceof Error && e.name === 'ZodError') return next(apiError(400, 'MONTO_INVALIDO', 'monto inválido'));
     next(e);
@@ -225,8 +234,10 @@ billetera.post('/wallets/:id/depositos', async (req, res, next) => {
  */
 billetera.post('/wallets/:id/retiros', async (req, res, next) => {
   try {
-    const monto = montoSchema.parse(req.body?.monto);
-    res.status(201).json(await operar(req.params.id, monto, 'retiro'));
+    const idResult = uuidSchema.safeParse(req.params.id);
+    if (!idResult.success) return next(apiError(400, 'VALIDATION_ERROR', 'id de billetera inválido'));
+    const { monto } = montoRequestSchema.parse(req.body);
+    res.status(201).json(await operar(idResult.data, monto, 'retiro'));
   } catch (e) {
     if (e instanceof Error && e.name === 'ZodError') return next(apiError(400, 'MONTO_INVALIDO', 'monto inválido'));
     next(e);
@@ -243,41 +254,65 @@ billetera.post('/transferencias', async (req, res, next) => {
   try {
     const key = req.header('Idempotency-Key');
     if (!key) return next(apiError(400, 'SIN_IDEMPOTENCIA', 'Idempotency-Key obligatorio'));
-    const parsed = transferenciaSchema.parse(req.body);
-    // Origen y destino aceptan UUID o alias (ej. "maria-02") para no pegar UUIDs.
-    const origen_id = (await resolverWalletId(parsed.origen_id)) ?? parsed.origen_id;
-    const destino_id = (await resolverWalletId(parsed.destino_id)) ?? parsed.destino_id;
-    const { monto } = parsed;
-    if (origen_id === destino_id) return next(apiError(400, 'MISMA_BILLETERA', 'origen y destino deben diferir'));
-
-    const prev = await pool.query(`SELECT referencia FROM billetera_movimientos WHERE idempotency_key = $1 LIMIT 1`, [key]);
-    if (prev.rows.length > 0) {
-      const ref = prev.rows[0].referencia as string;
-      const s = await pool.query(
-        `SELECT w.id, w.balance FROM wallets w JOIN billetera_movimientos m ON m.wallet_id = w.id WHERE m.referencia = $1`,
-        [ref],
-      );
-      const saldos: Record<string, string> = {};
-      for (const r of s.rows) saldos[r.id as string] = String(r.balance);
-      return res
-        .status(200)
-        .json({ referencia: ref, origen_balance: saldos[origen_id] ?? null, destino_balance: saldos[destino_id] ?? null, moneda: 'USD', replay: true });
+    if (!idempotencyKeySchema.safeParse(key).success) {
+      return next(apiError(400, 'VALIDATION_ERROR', 'Idempotency-Key debe ser UUID v4'));
     }
+    const parsed = transferenciaSchema.parse(req.body);
+    const origen_id = await resolverWalletId(parsed.origen_id);
+    const destino_id = await resolverWalletId(parsed.destino_id);
+    const { monto } = parsed;
+    if (!origen_id || !destino_id) return next(apiError(404, 'NO_ENCONTRADA', 'billetera origen o destino no encontrada'));
+    if (origen_id === destino_id) return next(apiError(400, 'MISMA_BILLETERA', 'origen y destino deben diferir'));
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // Serializa reintentos concurrentes de la misma operación.
+      await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, [`transferencia:${key}`]);
+
+      const prev = await client.query(
+        `SELECT wallet_id, monto, referencia, saldo_resultante
+           FROM billetera_movimientos
+          WHERE idempotency_key = $1 AND tipo = 'transfer_out'
+          LIMIT 1`,
+        [key],
+      );
+      if (prev.rows.length > 0) {
+        const anterior = prev.rows[0] as Record<string, unknown>;
+        const entrada = await client.query(
+          `SELECT wallet_id, saldo_resultante
+             FROM billetera_movimientos
+            WHERE referencia = $1 AND tipo = 'transfer_in'
+            LIMIT 1`,
+          [anterior.referencia],
+        );
+        if (
+          String(anterior.wallet_id) !== origen_id ||
+          String(anterior.monto) !== monto ||
+          entrada.rows.length === 0 ||
+          String(entrada.rows[0].wallet_id) !== destino_id
+        ) {
+          throw apiError(409, 'IDEMPOTENCY_CONFLICT', 'misma clave con datos diferentes');
+        }
+        await client.query('COMMIT');
+        return res.status(200).json({
+          referencia: anterior.referencia,
+          origen_balance: String(anterior.saldo_resultante),
+          destino_balance: String(entrada.rows[0].saldo_resultante),
+          moneda: 'USD',
+          replay: true,
+        });
+      }
+
       const [primero, segundo] = [origen_id, destino_id].sort();
-      const w = await client.query(`SELECT id, balance FROM wallets WHERE id = ANY($1) FOR UPDATE`, [[primero, segundo]]);
+      const w = await client.query(`SELECT id, balance FROM wallets WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE`, [[primero, segundo]]);
       if (w.rows.length < 2) {
-        await client.query('ROLLBACK');
-        return next(apiError(404, 'NO_ENCONTRADA', 'billetera origen o destino no encontrada'));
+        throw apiError(404, 'NO_ENCONTRADA', 'billetera origen o destino no encontrada');
       }
       const saldos: Record<string, string> = {};
       for (const r of w.rows) saldos[r.id as string] = String(r.balance);
       if (!gte(saldos[origen_id], monto)) {
-        await client.query('ROLLBACK');
-        return next(apiError(422, 'FONDOS_INSUFICIENTES', 'fondos insuficientes'));
+        throw apiError(422, 'FONDOS_INSUFICIENTES', 'fondos insuficientes');
       }
       const nuevoOrigen = sub(saldos[origen_id], monto);
       const nuevoDestino = add(saldos[destino_id], monto);
@@ -303,7 +338,6 @@ billetera.post('/transferencias', async (req, res, next) => {
       client.release();
     }
   } catch (e) {
-    if (e instanceof Error && e.name === 'ZodError') return next(apiError(400, 'VALIDATION_ERROR', 'cuerpo inválido'));
     next(e);
   }
 });
@@ -316,14 +350,15 @@ billetera.post('/transferencias', async (req, res, next) => {
  */
 billetera.get('/wallets/:id/movimientos', async (req, res, next) => {
   try {
+    const id = uuidSchema.parse(req.params.id);
     const page = paginationSchema.parse({ page: req.query.page, limit: req.query.limit });
-    const w = await pool.query(`SELECT id FROM wallets WHERE id = $1`, [req.params.id]);
+    const w = await pool.query(`SELECT id FROM wallets WHERE id = $1`, [id]);
     if (w.rows.length === 0) return next(apiError(404, 'NO_ENCONTRADA', 'billetera no encontrada'));
-    const total = await pool.query(`SELECT COUNT(*)::int AS c FROM billetera_movimientos WHERE wallet_id = $1`, [req.params.id]);
+    const total = await pool.query(`SELECT COUNT(*)::int AS c FROM billetera_movimientos WHERE wallet_id = $1`, [id]);
     const { rows } = await pool.query(
       `SELECT id, tipo, monto, moneda, saldo_resultante, referencia, creado_en FROM billetera_movimientos
        WHERE wallet_id = $1 ORDER BY creado_en DESC, id DESC LIMIT $2 OFFSET $3`,
-      [req.params.id, page.limit, (page.page - 1) * page.limit],
+      [id, page.limit, (page.page - 1) * page.limit],
     );
     res.json({
       items: rows.map((r: Record<string, unknown>) => ({

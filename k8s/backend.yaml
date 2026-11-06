@@ -17,13 +17,13 @@ spec:
     spec:
       containers:
         - name: ms-depositos-usd
-          image: dolara-backend:latest
+          image: billetera-usd-backend:latest
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
-                name: dolara-config
+                name: billetera-usd-config
             - secretRef:
-                name: dolara-secret
+                name: billetera-usd-secret
           ports:
             - containerPort: 3001
               name: http

@@ -1,6 +1,6 @@
 # SDD Completo — Microservicio de Depósitos USD [HISTÓRICO v1 CONGELADO — NO EDITAR]
 
-> ⚠️ PLAN A: documento congelado en v1 (NestJS propuesto, previo a DOLARA). Se conserva solo como evidencia histórica.
+> ⚠️ PLAN A: documento congelado en v1 (NestJS propuesto, previo a Billetera Digital USD). Se conserva solo como evidencia histórica.
 > Fuente vigente: `spec.md v2` + `06_ARQUITECTURA_Y_FLUJOS.md` + `00_INDICE_Y_USO.md`.
 > No regenerar ni usar como referencia de implementación. Última compilación v1: 01+02+03+04+05.
 
@@ -1669,7 +1669,7 @@ Los puertos son convenciones y pueden cambiar si la clase ya definió otros.
 | Depósitos PEN | 3004 |
 | Retiros USD | 3005 |
 | Retiros PEN | 3006 |
-| PostgreSQL Depósitos USD host | 5433 |
+| PostgreSQL Depósitos USD host | 5434 |
 
 Los puertos internos deben quedar documentados y libres de colisiones.
 

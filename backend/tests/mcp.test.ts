@@ -44,7 +44,7 @@ describe('MCP Sandbox y Contratos Canónicos (Specs 002)', () => {
       const resDocs = await request(app).get('/docs.json');
       expect(resDocs.status).toBe(200);
       expect(resDocs.body.openapi).toMatch(/^3\./);
-      expect(resDocs.body.info.title).toContain('DOLARA');
+      expect(resDocs.body.info.title).toContain('Billetera Digital USD');
 
       const resOpenApi = await request(app).get('/openapi.json');
       expect(resOpenApi.status).toBe(200);
@@ -69,12 +69,18 @@ describe('MCP Sandbox y Contratos Canónicos (Specs 002)', () => {
     it('POST /api/v1/sandbox/reset limpia registros de prueba', async () => {
       // Insertar un usuario y depósito de prueba sandbox
       await pool.query(`INSERT INTO wallets (user_id, balance, moneda) VALUES ('sandbox-temp', 10, 'USD')`);
+      const sandboxRef = randomUUID();
+      const regularRef = randomUUID();
+      await pool.query(`INSERT INTO fake_ledger (referencia, cliente_id, monto) VALUES ($1, 'sandbox-temp', 10), ($2, 'A', 20)`, [sandboxRef, regularRef]);
       const res = await request(app).post('/api/v1/sandbox/reset');
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('success');
 
       const { rows } = await pool.query(`SELECT 1 FROM wallets WHERE user_id = 'sandbox-temp'`);
       expect(rows.length).toBe(0);
+      const ledger = await pool.query('SELECT referencia FROM fake_ledger WHERE referencia = ANY($1::text[])', [[sandboxRef, regularRef]]);
+      expect(ledger.rows.map((row) => row.referencia)).toEqual([regularRef]);
+      await pool.query('DELETE FROM fake_ledger WHERE referencia = $1', [regularRef]);
     });
   });
 
@@ -96,8 +102,8 @@ describe('MCP Sandbox y Contratos Canónicos (Specs 002)', () => {
     });
 
     it('depositos_crear_usd: 1 vs 10 repeticiones con misma key acreditan exactamente una vez', async () => {
-      const key = `key-idempotente-${Date.now()}`;
-      const clienteId = 'cliente-activo';
+      const key = randomUUID();
+      const clienteId = 'A';
 
       // 1ra llamada: crea el depósito
       const res1 = await client.crearDeposito(
@@ -125,16 +131,16 @@ describe('MCP Sandbox y Contratos Canónicos (Specs 002)', () => {
     });
 
     it('rechaza con 409 IDEMPOTENCY_CONFLICT si la misma key lleva un payload diferente', async () => {
-      const key = `key-conflict-${Date.now()}`;
+      const key = randomUUID();
       const res1 = await client.crearDeposito(
-        { cliente_id: 'cliente-activo', monto: '15.00', metodo_origen: 'TRANSFERENCIA' },
+        { cliente_id: 'A', monto: '15.00', metodo_origen: 'TRANSFERENCIA' },
         key,
       );
       expect(res1.status).toBe(201);
 
       // Mismo key, distinto monto ($30.00)
       const resConflict = await client.crearDeposito(
-        { cliente_id: 'cliente-activo', monto: '30.00', metodo_origen: 'TRANSFERENCIA' },
+        { cliente_id: 'A', monto: '30.00', metodo_origen: 'TRANSFERENCIA' },
         key,
       );
       expect(resConflict.status).toBe(409);
@@ -143,7 +149,7 @@ describe('MCP Sandbox y Contratos Canónicos (Specs 002)', () => {
 
     it('rechaza con 400 VALIDATION_ERROR cualquier intento de usar moneda PEN', async () => {
       const res = await client.crearDeposito({
-        cliente_id: 'cliente-activo',
+        cliente_id: 'A',
         monto: '50.00',
         metodo_origen: 'TRANSFERENCIA',
         moneda: 'PEN',
@@ -154,7 +160,7 @@ describe('MCP Sandbox y Contratos Canónicos (Specs 002)', () => {
 
     it('rechaza con 422 CUSTOMER_BLOCKED si el cliente está bloqueado', async () => {
       const res = await client.crearDeposito({
-        cliente_id: 'cliente-bloqueado',
+        cliente_id: 'B',
         monto: '100.00',
         metodo_origen: 'TRANSFERENCIA',
       });
@@ -164,7 +170,7 @@ describe('MCP Sandbox y Contratos Canónicos (Specs 002)', () => {
 
     it('rechaza con 422 USD_ACCOUNT_NOT_ENABLED si el cliente solo tiene cuenta PEN', async () => {
       const res = await client.crearDeposito({
-        cliente_id: 'cliente-pen',
+        cliente_id: 'C',
         monto: '100.00',
         metodo_origen: 'TRANSFERENCIA',
       });

@@ -12,7 +12,7 @@ import { AuthService } from './auth.service';
       <header class="topbar">
         <div class="topbar-row">
           <div class="brand-mark">$</div>
-          <div class="brand-name">DOLARA<small>Tu billetera en dólares · USD-only</small></div>
+          <div class="brand-name">Billetera Digital USD<small>Tu saldo y operaciones en dólares</small></div>
           <span class="topbar-badge">USD ● $</span>
           <span class="topbar-user" *ngIf="auth.sesion() as s">{{ s.nombre || s.user_id }}</span>
           <button class="eye-btn" *ngIf="auth.logueado()" (click)="auth.salir()">Salir</button>
@@ -48,7 +48,7 @@ import { AuthService } from './auth.service';
 })
 export class AppComponent {
   auth = inject(AuthService);
-  title = 'DOLARA — Billetera en Dólares';
+  title = 'Billetera Digital USD';
   apiNombre(s: { nombre: string | null; user_id: string }) {
     return s.nombre || s.user_id;
   }

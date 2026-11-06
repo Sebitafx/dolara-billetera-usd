@@ -21,7 +21,7 @@ FX_TTL_MIN=60
 FX_TIMEOUT_MS=5000
 ```
 
-Puertos de clase (05 §4): api **3001**, Gateway 8080, Clientes 3002, Saldos 3003; Postgres host **5433**.
+Puertos de clase (05 §4): api **3001**, Gateway 8080, Clientes 3002, Saldos 3003; Postgres host **5434**.
 
 ## 2. Estructura de carpetas objetivo
 

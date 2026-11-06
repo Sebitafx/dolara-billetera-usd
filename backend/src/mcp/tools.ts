@@ -275,7 +275,7 @@ export function registerTools(server: McpServer, client: SandboxHttpClient) {
   // Tool 8: Limpiar datos del Sandbox
   server.tool(
     'sandbox_reset_estado',
-    'Limpia los fixtures y registros de prueba creados durante las sesiones de prueba con prefijo demo o sandbox.',
+    'Limpia registros de prueba con prefijo sandbox- o test- cuando SANDBOX_MODE está habilitado fuera de producción.',
     {},
     async () => {
       const res = await client.resetSandbox();

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
 import { apiError, correlationId } from '../errors.js';
-import { crearDepositoSchema, paginationSchema } from '../validators.js';
+import { crearDepositoSchema, idempotencyKeySchema, paginationSchema, uuidSchema, walletOwnerIdSchema } from '../validators.js';
 import { crearDeposito, AppError } from '../usecases/create-deposit.js';
 import { FakeBalanceAdapter, FakeCustomerAccountAdapter } from '../adapters/fakes.js';
 import { BalanceHttpAdapter, CustomerAccountHttpAdapter } from '../adapters/http.js';
@@ -27,19 +27,32 @@ deposits.post('/', async (req, res, next) => {
   try {
     const key = req.header('Idempotency-Key');
     if (!key) return next(apiError(400, 'VALIDATION_ERROR', 'Idempotency-Key obligatorio'));
+    if (!idempotencyKeySchema.safeParse(key).success) {
+      return next(apiError(400, 'VALIDATION_ERROR', 'Idempotency-Key debe ser UUID v4'));
+    }
     const parsed = crearDepositoSchema.safeParse(req.body);
     if (!parsed.success) {
       const monedaMal = parsed.error.issues.some((i) => String(i.path[0] ?? '') === 'moneda');
       if (monedaMal) return next(apiError(400, 'VALIDATION_ERROR', 'billetera USD-only: moneda debe ser USD'));
-      const montoMal = req.body?.monto !== undefined;
+      const montoMal = parsed.error.issues.some((i) => String(i.path[0] ?? '') === 'monto');
       return next(apiError(400, montoMal ? 'INVALID_AMOUNT' : 'VALIDATION_ERROR', 'payload inválido'));
     }
     const p = ports();
-    const { deposito, replay } = await crearDeposito(
-      { ...parsed.data, idempotencyKey: key },
-      { customers: p.customers, balance: p.balance },
-    );
-    res.status(replay ? 200 : 201).json(deposito);
+    const lock = await pool.connect();
+    try {
+      await lock.query(`SELECT pg_advisory_lock(hashtextextended($1, 0))`, [`deposito:${key}`]);
+      const { deposito, replay } = await crearDeposito(
+        { ...parsed.data, idempotencyKey: key },
+        { customers: p.customers, balance: p.balance },
+      );
+      res.status(replay ? 200 : 201).json(deposito);
+    } finally {
+      try {
+        await lock.query(`SELECT pg_advisory_unlock(hashtextextended($1, 0))`, [`deposito:${key}`]);
+      } finally {
+        lock.release();
+      }
+    }
   } catch (e) {
     if (e instanceof AppError) return next(apiError(e.status, e.code, e.message));
     next(e);
@@ -54,7 +67,8 @@ deposits.post('/', async (req, res, next) => {
  */
 deposits.get('/:id', async (req, res, next) => {
   try {
-    const { rows } = await pool.query(`SELECT * FROM depositos_usd WHERE id = $1`, [req.params.id]);
+    const id = uuidSchema.parse(req.params.id);
+    const { rows } = await pool.query(`SELECT * FROM depositos_usd WHERE id = $1`, [id]);
     if (rows.length === 0) return next(apiError(404, 'NOT_FOUND', 'depósito no existe'));
     const r = rows[0];
     res.json({
@@ -81,8 +95,7 @@ deposits.get('/:id', async (req, res, next) => {
  */
 deposits.get('/', async (req, res, next) => {
   try {
-    const cliente_id = String(req.query.cliente_id ?? '');
-    if (!cliente_id) return next(apiError(400, 'VALIDATION_ERROR', 'cliente_id obligatorio'));
+    const cliente_id = walletOwnerIdSchema.parse(req.query.cliente_id);
     const page = paginationSchema.parse({ page: req.query.page, limit: req.query.limit });
     const total = await pool.query(`SELECT COUNT(*)::int AS c FROM depositos_usd WHERE cliente_id = $1`, [cliente_id]);
     const { rows } = await pool.query(

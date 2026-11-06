@@ -1,6 +1,6 @@
-# Documentación técnica — DOLARA Billetera USD-only (v2)
+# Documentación técnica — Billetera Digital USD Billetera USD-only (v2)
 
-Esta carpeta contiene la especificación de **DOLARA — billetera 100% en dólares** (evolución del microservicio Depósitos USD).
+Esta carpeta contiene la especificación de **Billetera Digital USD — billetera 100% en dólares** (evolución del microservicio Depósitos USD).
 
 ## Archivos
 
@@ -57,7 +57,7 @@ plan.md v3 + 01 SDD base v1 (cómo)
 | **Zod 3.23** | Validación de Esquemas | Validación estricta en el borde (Fail-Fast en runtime) con tipado inferido estáticamente (`z.infer`). | Validación de montos positivos (≤2 decimales), alias de usuario, PIN numérico y rechazo inmediato de monedas no permitidas (`PEN` → 400). |
 | **Aritmética Exacta (`money.ts`)** | Precisión Monetaria (Cero Floats) | Neutraliza los errores de redondeo del estándar IEEE-754 de punto flotante en JavaScript. Operaciones en centavos enteros (`BigInt` / enteros). | Todas las sumas, restas y comparaciones de saldos (`toCents`, `add`, `sub`, `gte`), redondeo half-up en conversiones FX. |
 | **Vitest 2.1 & Supertest** | Testing Automatizado | Ejecución ultrarrápida con soporte ESM nativo sin transpiladores lentos tipo Babel o ts-jest. | Pruebas unitarias de dominio, pruebas de casos de uso con adaptadores en memoria, pruebas E2E contra PostgreSQL y pruebas de concurrencia e idempotencia. |
-| **Angular 18+ (SPA DOLARA)** | Frontend Web Banca Móvil | Framework empresarial con Standalone Components, Signals para reactividad granular sin sobrecarga, inyección de dependencias limpia y Guards de enrutamiento. | Interfaz de usuario responsive (móvil y escritorio) para acceso demo, consulta de saldo, recargas con voucher, transferencias con buscador de alias e historial. |
+| **Angular 18+ (SPA Billetera Digital USD)** | Frontend Web Banca Móvil | Framework empresarial con Standalone Components, Signals para reactividad granular sin sobrecarga, inyección de dependencias limpia y Guards de enrutamiento. | Interfaz de usuario responsive (móvil y escritorio) para acceso demo, consulta de saldo, recargas con voucher, transferencias con buscador de alias e historial. |
 | **Nginx & Docker Compose** | Infraestructura y Red | Nginx sirve assets estáticos con latencia mínima y actúa como reverse proxy a la API (`/api`). Docker Compose garantiza reproducibilidad en la red compartida `wallet-network`. | Despliegue local y en CI/CD con un comando, comunicación entre contenedores sin exponer puertos innecesarios al host. |
 | **OpenAPI 3.x / Swagger UI** | Documentación de Contratos | Estándar de la industria para exponer contratos vivos en `/docs`. | Permite a otros equipos (Clientes, Saldos, Gateway) probar e integrar endpoints sin depender de colecciones manuales. |
 | **RabbitMQ + Transactional Outbox** | Mensajería Asíncrona (Reservado) | Desacopla eventos evitando la pérdida de mensajes (el evento se persiste en la BD en la misma transacción que el depósito). | Publicación asíncrona de eventos `deposit.usd.completed.v1` hacia servicios de notificaciones, analítica y contabilidad. |

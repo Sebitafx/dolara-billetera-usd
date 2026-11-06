@@ -41,7 +41,7 @@ const MIGRATIONS = [
      fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
    );
    -- Módulo billetera USD (antes "local"): billetera en dólares en todo su esplendor.
-   -- Moneda USD explícita para blindaje USD-only (refactorización DOLARA v2).
+   -- Moneda USD explícita para blindaje USD-only (refactorización Billetera Digital USD v2).
    CREATE TABLE IF NOT EXISTS wallets (
      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
      user_id TEXT NOT NULL UNIQUE,
@@ -70,7 +70,7 @@ const MIGRATIONS = [
        ALTER TABLE billetera_movimientos ADD COLUMN moneda CHAR(3) NOT NULL DEFAULT 'USD' CHECK (moneda = 'USD');
      END IF;
    END $$;`,
-  // v3: acceso demo DOLARA — nombre visible + pin hash (sesión por usuario, sin auth real).
+  // v3: acceso demo Billetera Digital USD — nombre visible + pin hash (sesión por usuario, sin auth real).
   `DO $$ BEGIN
      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wallets' AND column_name='nombre') THEN
        ALTER TABLE wallets ADD COLUMN nombre TEXT;
@@ -79,6 +79,9 @@ const MIGRATIONS = [
        ALTER TABLE wallets ADD COLUMN pin_hash TEXT;
      END IF;
    END $$;`,
+  // v4: metadatos de vigencia entregados por el proveedor FX externo.
+  `ALTER TABLE fx_rates ADD COLUMN IF NOT EXISTS provider_updated_at TIMESTAMPTZ;
+   ALTER TABLE fx_rates ADD COLUMN IF NOT EXISTS next_update_at TIMESTAMPTZ;`,
 ];
 
 export async function migrate(): Promise<void> {

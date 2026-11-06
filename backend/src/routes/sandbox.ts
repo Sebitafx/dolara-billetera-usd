@@ -5,11 +5,7 @@ import { apiError } from '../errors.js';
 export const sandbox = Router();
 
 function isSandboxAllowed(): boolean {
-  return (
-    process.env.SANDBOX_MODE === 'true' ||
-    (process.env.USE_FAKES ?? 'true') === 'true' ||
-    process.env.NODE_ENV !== 'production'
-  );
+  return process.env.SANDBOX_MODE === 'true' && process.env.NODE_ENV !== 'production';
 }
 
 /**
@@ -28,8 +24,7 @@ sandbox.post('/reset', async (req, res, next) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      // Limpiar fake_ledger
-      await client.query('DELETE FROM fake_ledger');
+      await client.query("DELETE FROM fake_ledger WHERE cliente_id LIKE 'sandbox-%' OR cliente_id LIKE 'test-%'");
       // Limpiar transacciones y billeteras generadas con prefijos de prueba
       await client.query(`
         DELETE FROM billetera_movimientos 
@@ -53,7 +48,7 @@ sandbox.post('/reset', async (req, res, next) => {
 
     res.json({
       status: 'success',
-      message: 'Sandbox reiniciado exitosamente. Datos demo limpios.',
+      message: 'Sandbox reiniciado exitosamente. Datos de prueba limpios.',
       timestamp: new Date().toISOString(),
     });
   } catch (e) {

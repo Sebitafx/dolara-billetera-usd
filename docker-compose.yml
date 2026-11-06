@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: deposit_usd
       POSTGRES_DB: depositos_usd
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - pgdata-depositos:/var/lib/postgresql/data
     networks: [wallet-network]
@@ -18,7 +18,9 @@ services:
       retries: 10
 
   ms-depositos-usd:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: ms-depositos-usd
     environment:
       PORT: 3001
@@ -26,15 +28,31 @@ services:
       CUSTOMER_SERVICE_URL: http://ms-clientes:3002
       BALANCE_SERVICE_URL: http://ms-saldos:3003
       USE_FAKES: "true"
+      SANDBOX_MODE: ${SANDBOX_MODE:-false}
       HTTP_TIMEOUT_MS: 3000
+      FX_PROVIDER_URL: https://open.er-api.com/v6/latest/USD
       FX_API_KEY: ${FX_API_KEY:-}
-      FX_TTL_MIN: 60
+      FX_TTL_MIN: 1440
       FX_TIMEOUT_MS: 5000
     ports:
       - "3001:3001"
     depends_on:
       db-depositos-usd:
         condition: service_healthy
+    networks: [wallet-network]
+
+  mcp-sandbox:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["node", "dist/mcp/index.js", "--transport", "http", "--port", "3005"]
+    environment:
+      SANDBOX_API_BASE_URL: http://ms-depositos-usd:3001
+      MCP_PORT: 3005
+    ports:
+      - "127.0.0.1:3005:3005"
+    depends_on:
+      - ms-depositos-usd
     networks: [wallet-network]
 
   web:

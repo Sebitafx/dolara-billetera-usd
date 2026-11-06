@@ -13,7 +13,7 @@ import { ApiErrorBody } from '../api.service';
   template: `
     <div class="auth-layout">
     <section class="card hero-card">
-      <div class="hero-label">DOLARA · Billetera en dólares</div>
+      <div class="hero-label">Billetera Digital USD</div>
       <div class="hero-balance">Hola 👋</div>
       <div class="hero-sub">Entra con tu alias y PIN demo. Cada usuario ve solo su saldo e historial.</div>
       <div class="hero-row">

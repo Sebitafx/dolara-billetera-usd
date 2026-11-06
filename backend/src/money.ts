@@ -22,13 +22,36 @@ export function gte(a: string, b: string): boolean {
   return toCents(a) >= toCents(b);
 }
 
-/** Conversión con redondeo half-up a 2 decimales (S-3). tasa con hasta 6 decimales. */
-export function convertir(monto: string, tasa: string, invertir: boolean): string {
-  const scale = 1_000_000;
-  const tasaInt = Math.round(Number(tasa) * scale);
-  const cents = toCents(monto);
-  const resultado = invertir
-    ? Math.round((cents * scale) / tasaInt) // PEN -> USD (centavos de USD)
-    : Math.round((cents * tasaInt) / scale); // USD -> PEN (centavos de PEN)
-  return fromCents(resultado);
+const RATE_SCALE = 1_000_000n;
+
+function decimalToScaled(value: string, decimals: number): bigint {
+  const match = value.match(/^(\d+)(?:\.(\d+))?$/);
+  if (!match || (match[2]?.length ?? 0) > decimals) throw new Error('decimal inválido');
+  return BigInt(match[1]) * 10n ** BigInt(decimals) + BigInt((match[2] ?? '').padEnd(decimals, '0'));
+}
+
+function centsToMoney(cents: bigint): string {
+  return `${cents / 100n}.${(cents % 100n).toString().padStart(2, '0')}`;
+}
+
+function divideHalfUp(numerator: bigint, denominator: bigint): bigint {
+  if (denominator <= 0n) throw new Error('divisor inválido');
+  return (numerator + denominator / 2n) / denominator;
+}
+
+/** Tasa PEN/USD derivada de USD/PEN, con 6 decimales y redondeo half-up. */
+export function tasaInversa(tasaUsdPen: string): string {
+  const direct = decimalToScaled(tasaUsdPen, 6);
+  const inverse = divideHalfUp(RATE_SCALE * RATE_SCALE, direct);
+  return `${inverse / RATE_SCALE}.${(inverse % RATE_SCALE).toString().padStart(6, '0')}`;
+}
+
+/** Conversión exacta con BigInt y redondeo half-up a 2 decimales. */
+export function convertir(monto: string, tasaUsdPen: string, invertir: boolean): string {
+  const rate = decimalToScaled(tasaUsdPen, 6);
+  const cents = decimalToScaled(monto, 2);
+  const converted = invertir
+    ? divideHalfUp(cents * RATE_SCALE, rate) // PEN -> USD
+    : divideHalfUp(cents * rate, RATE_SCALE); // USD -> PEN
+  return centsToMoney(converted);
 }

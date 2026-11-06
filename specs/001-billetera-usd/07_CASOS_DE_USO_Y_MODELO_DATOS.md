@@ -1,6 +1,6 @@
-# 07 — Casos de Usuario, Modelo de Datos y Estándares de Ingeniería · DOLARA (v2)
+# 07 — Casos de Usuario, Modelo de Datos y Estándares de Ingeniería · Billetera Digital USD (v2)
 
-> **Propósito del documento**: Servir como especificación formal de ingeniería para el desarrollo funcional, pruebas y auditoría de la billetera digital en dólares (**DOLARA**). Define los **Casos de Uso de Usuario** estructurados, el **Diagrama Entidad-Relación (ERD) completo de Base de Datos**, los **Diagramas de Estado y Secuencia** y los **Estándares Técnicos y Financieros** obligatorios del sistema.
+> **Propósito del documento**: Servir como especificación formal de ingeniería para el desarrollo funcional, pruebas y auditoría de la billetera digital en dólares (**Billetera Digital USD**). Define los **Casos de Uso de Usuario** estructurados, el **Diagrama Entidad-Relación (ERD) completo de Base de Datos**, los **Diagramas de Estado y Secuencia** y los **Estándares Técnicos y Financieros** obligatorios del sistema.
 
 ---
 
@@ -8,7 +8,7 @@
 
 El sistema opera sobre PostgreSQL 16+. La arquitectura de persistencia se divide en dos dominios claramente desacoplados:
 1. **Dominio de Auditoría de Depósitos Inter-servicios (`depositos_usd` y `fake_ledger`)**: Trazabilidad de recargas externas que interactúan con los microservicios de Clientes y Saldos.
-2. **Dominio Transaccional de Billetera DOLARA (`wallets` y `billetera_movimientos`)**: Manejo del balance propio del usuario, transferencias entre cuentas y libro mayor de movimientos inmutables.
+2. **Dominio Transaccional de Billetera Billetera Digital USD (`wallets` y `billetera_movimientos`)**: Manejo del balance propio del usuario, transferencias entre cuentas y libro mayor de movimientos inmutables.
 3. **Módulo Informativo FX (`fx_rates`)**: Almacenamiento en caché de tasas de cambio referenciales sin impacto en saldos.
 
 ### 1.1 Diagrama Entidad-Relación Completo (Mermaid ERD)
@@ -22,7 +22,7 @@ erDiagram
         uuid id PK "gen_random_uuid()"
         text user_id UK "Alias único (minúsculas, 3-30 cars)"
         text nombre "Nombre del usuario (opcional)"
-        text pin_hash "SHA-256 dolara-demo:pin"
+        text pin_hash "SHA-256 billetera-digital-usd-demo:pin"
         numeric balance "NUMERIC(18,2) DEFAULT 0 CHECK >= 0"
         char moneda "CHAR(3) DEFAULT 'USD' CHECK = 'USD'"
         timestamptz creado_en "DEFAULT now()"
@@ -108,7 +108,7 @@ erDiagram
 ## 2. Casos de Usuario y Casos de Uso Detallados (BDD Gherkin)
 
 ### CU-00: Registro y Acceso Demo Seguro (Alias + PIN)
-- **Actor Principal**: Usuario de la Billetera (SPA DOLARA).
+- **Actor Principal**: Usuario de la Billetera (SPA Billetera Digital USD).
 - **Precondiciones**: Ninguna.
 - **Postcondiciones**: Se crea una billetera en dólares con saldo `0.00` y sesión local activa.
 
@@ -211,7 +211,7 @@ Escenario: Rechazo de depósito en moneda no permitida (PEN)
 - **Postcondiciones**: El saldo de la billetera se actualiza con precisión de centavos y se inserta un registro inmutable en `billetera_movimientos`.
 
 ```gherkin
-Escenario: Recarga directa en billetera DOLARA
+Escenario: Recarga directa en billetera Billetera Digital USD
   Dado que la billetera tiene un saldo actual de "100.00" USD
   Cuando el usuario envía POST /api/v1/billetera/wallets/{id}/depositos con monto "50.25"
   Entonces la base de datos bloquea la fila de la billetera con FOR UPDATE
@@ -355,7 +355,7 @@ stateDiagram-v2
 
 ### Estándar 4: Seguridad y Protección de Datos Sensibles (OWASP & PCI-DSS)
 * **Regla Obligatoria**:
-  1. El PIN de acceso de los usuarios jamás se almacena en texto plano. Se almacena únicamente su digestión criptográfica `SHA-256` con prefijo salt (`dolara-demo:<pin>`).
+  1. El PIN de acceso de los usuarios jamás se almacena en texto plano. Se almacena únicamente su digestión criptográfica `SHA-256` con prefijo de dominio (`billetera-digital-usd-demo:<pin>`).
   2. Todas las consultas a PostgreSQL utilizan consultas parametrizadas (`$1, $2, ...`) mediante la biblioteca `pg`. Cero concatenación manual de cadenas para neutralizar inyecciones SQL.
   3. Ningún secreto, credencial de base de datos o API key debe guardarse en el repositorio de Git. Todo se inyecta mediante variables de entorno (`.env` local, Docker Compose).
 
@@ -393,7 +393,7 @@ stateDiagram-v2
 | **RF-6** (Auditoría e Historial de Depósitos) | `CU-01`, `CU-02` | `routes/deposits.ts` (`GET /`, `GET /:id`) | `api.test.ts (get_by_id, historial)` |
 | **RF-7** (Observabilidad y Documentación) | Todos | `routes/health.ts`, Swagger `/docs` | `api.test.ts (health, docs, correlation)` |
 | **RF-8** (Tasa de Cambio Referencial) | `CU-04` | `backend/src/fx.ts`, `routes/fx.ts` | `fx.test.ts`, `api.test.ts (fx_tasa, fx_convertir)` |
-| **RF-9 .. RF-12** (Operaciones de Billetera DOLARA) | `CU-02`, `CU-03` | `routes/billetera.ts`, `backend/src/money.ts` | `billetera.test.ts`, `money.test.ts` |
+| **RF-9 .. RF-12** (Operaciones de Billetera Billetera Digital USD) | `CU-02`, `CU-03` | `routes/billetera.ts`, `backend/src/money.ts` | `billetera.test.ts`, `money.test.ts` |
 | **RF-13** (Acceso Demo, Búsqueda de Usuarios) | `CU-00`, `CU-03` | `routes/billetera.ts` (`/registro`, `/login`, `/usuarios/buscar`) | `billetera.test.ts`, pruebas E2E SPA |
 
 ---
@@ -459,7 +459,7 @@ Para garantizar que el software sea robusto, mantenible, seguro y de alto rendim
 * **Casos de aplicación**:
   - Generación de identificadores únicos universales (`randomUUID()`).
   - Generación de huellas digitales de idempotencia (`createHash('sha256')`).
-  - Hash seguro de credenciales demo (`sha256('dolara-demo:' + pin)`).
+  - Hash de credenciales demo (`sha256('billetera-digital-usd-demo:' + pin)`).
 
 #### 7. OpenAPI 3.x & Swagger UI (`swagger-ui-express` + `swagger-jsdoc`)
 * **¿Por qué se eligió?**:
@@ -477,7 +477,7 @@ Para garantizar que el software sea robusto, mantenible, seguro y de alto rendim
   - Pruebas de integración E2E con Supertest contra la base de datos PostgreSQL real.
   - Pruebas de concurrencia e idempotencia con múltiples peticiones simultáneas.
 
-#### 9. Angular 18+ (SPA DOLARA) con Standalone Components & Signals
+#### 9. Angular 18+ (SPA Billetera Digital USD) con Standalone Components & Signals
 * **¿Por qué se eligió?**:
   - Framework robusto y estructurado para aplicaciones bancarias.
   - **Standalone Components**: Eliminan la complejidad de `NgModules` y reducen el tamaño del bundle.
