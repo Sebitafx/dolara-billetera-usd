@@ -6,6 +6,16 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: production-billetera-usd
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_API_VERSION: "1.2.0"
+
 jobs:
   test:
     name: 🧪 Run Unit & Integration Tests
@@ -34,7 +44,9 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
       - name: 📦 Install backend dependencies
         run: |
@@ -49,6 +61,18 @@ jobs:
           cd backend
           npm test
 
+      - name: 🏗️ Build backend
+        run: npm run build --prefix backend
+
+      - name: 📦 Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: 🏗️ Build frontend
+        run: npm run build --prefix frontend
+
+      - name: 📜 Validate OpenAPI contract
+        run: npx --yes @redocly/cli@2.76.0 lint docs/openapi.yaml
+
   deploy:
     name: ☸️ Deploy to Kubernetes (EC2)
     needs: test
@@ -57,8 +81,38 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🚀 Remote Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
+      - name: 🐳 Build immutable Linux images
+        run: |
+          docker build --platform linux/amd64 -t "billetera-usd-backend:${GITHUB_SHA}" -f backend/Dockerfile .
+          docker build --platform linux/amd64 -t "billetera-usd-frontend:${GITHUB_SHA}" ./frontend
+          docker save "billetera-usd-backend:${GITHUB_SHA}" -o backend-image.tar
+          docker save "billetera-usd-frontend:${GITHUB_SHA}" -o frontend-image.tar
+
+      - name: 📦 Package exact source revision
+        run: |
+          tar \
+            --exclude=.git \
+            --exclude=backend/node_modules \
+            --exclude=backend/dist \
+            --exclude=frontend/node_modules \
+            --exclude=frontend/dist \
+            --exclude=backend-image.tar \
+            --exclude=frontend-image.tar \
+            --exclude=release.tar.gz \
+            -czf release.tar.gz .
+
+      - name: 📤 Transfer release and images
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          source: "release.tar.gz,backend-image.tar,frontend-image.tar"
+          target: "/tmp/billetera-${{ github.sha }}"
+
+      - name: 🚀 Import images and deploy exact revision
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
@@ -67,7 +121,25 @@ jobs:
           script_stop: true
           script: |
             set -e
-            echo "Conectado al servidor EC2: $(uname -a)"
-            cd /home/ec2-user/billetera-digital-usd
+            RELEASE_SHA="${{ github.sha }}"
+            UPLOAD_DIR="/tmp/billetera-${RELEASE_SHA}"
+            RELEASE_DIR="/home/ec2-user/releases/billetera-${RELEASE_SHA}"
+            mkdir -p "${RELEASE_DIR}"
+            tar -xzf "${UPLOAD_DIR}/release.tar.gz" -C "${RELEASE_DIR}"
+            sudo k3s ctr images import "${UPLOAD_DIR}/backend-image.tar"
+            sudo k3s ctr images import "${UPLOAD_DIR}/frontend-image.tar"
+            cd "${RELEASE_DIR}"
             chmod +x scripts/deploy.sh
-            bash scripts/deploy.sh
+            SKIP_IMAGE_BUILD=true IMAGE_TAG="${RELEASE_SHA}" DEPLOY_COMMIT="${RELEASE_SHA}" bash scripts/deploy.sh
+            printf '%s\n' "${RELEASE_SHA}" > DEPLOYED_COMMIT
+            ln -sfn "${RELEASE_DIR}" /home/ec2-user/billetera-current
+            rm -f "${UPLOAD_DIR}/release.tar.gz" "${UPLOAD_DIR}/backend-image.tar" "${UPLOAD_DIR}/frontend-image.tar"
+            rmdir "${UPLOAD_DIR}"
+
+      - name: 🔎 Verify public health and OpenAPI version
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          curl --fail --retry 12 --retry-delay 5 "http://${EC2_HOST}/health/ready"
+          curl --fail --retry 12 --retry-delay 5 "http://${EC2_HOST}/docs.json" -o deployed-openapi.json
+          node -e "const fs=require('fs'); const api=JSON.parse(fs.readFileSync('deployed-openapi.json')); if(api.info?.version !== process.env.EXPECTED_API_VERSION) { throw new Error('OpenAPI desplegado: ' + api.info?.version + '; esperado: ' + process.env.EXPECTED_API_VERSION); }"
