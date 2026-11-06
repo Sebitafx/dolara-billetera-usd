@@ -96,3 +96,4 @@ export default function () {
 
   sleep(0.3 + Math.random() * 0.4); // Pausa realista entre transacciones (300ms a 700ms)
 }
+

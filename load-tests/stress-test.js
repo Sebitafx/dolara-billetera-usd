@@ -51,3 +51,4 @@ export default function () {
 
   sleep(0.1 + Math.random() * 0.2); // Peticiones muy agresivas (100ms - 300ms)
 }
+
