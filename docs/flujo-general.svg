@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="1000" viewBox="0 0 1320 1000" font-family="'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <marker id="f1" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#16a34a"/></marker>
+  </defs>
+  <rect x="0" y="0" width="1320" height="1000" fill="#ffffff"/>
+  <text x="60" y="54" font-size="26" font-weight="700" fill="#1a202c">Flujo general — de cero a transferir <tspan font-size="15" font-weight="400" fill="#64748b">(demo con alias+PIN · todo en USD)</tspan></text>
+
+  <!-- Paso 1 -->
+  <circle cx="120" cy="170" r="30" fill="#f59e0b"/>
+  <text x="120" y="180" font-size="26" font-weight="800" fill="#1c1005" text-anchor="middle">1</text>
+  <rect x="170" y="115" width="620" height="110" rx="12" fill="#ffffff" stroke="#1e9e5a" stroke-width="2.5"/>
+  <text x="196" y="150" font-size="20" font-weight="700" fill="#0f5132">🔑 Acceso demo</text>
+  <text x="196" y="176" font-size="14" fill="#14532d" font-family="Consolas, monospace">POST /billetera/registro · /login { alias, PIN }</text>
+  <text x="196" y="200" font-size="14" fill="#14532d">Sesión en este dispositivo → guard redirige a /acceso</text>
+  <text x="820" y="170" font-size="14" fill="#64748b">Sin correo · PIN con hash</text>
+
+  <line x1="480" y1="225" x2="480" y2="262" stroke="#16a34a" stroke-width="2.5" marker-end="url(#f1)"/>
+
+  <!-- Paso 2 -->
+  <circle cx="120" cy="340" r="30" fill="#f59e0b"/>
+  <text x="120" y="350" font-size="26" font-weight="800" fill="#1c1005" text-anchor="middle">2</text>
+  <rect x="170" y="285" width="620" height="110" rx="12" fill="#ffffff" stroke="#1e9e5a" stroke-width="2.5"/>
+  <text x="196" y="320" font-size="20" font-weight="700" fill="#0f5132">💵 Recarga auditada</text>
+  <text x="196" y="346" font-size="14" fill="#14532d" font-family="Consolas, monospace">POST /depositos/usd + Idempotency-Key</text>
+  <text x="196" y="370" font-size="14" fill="#14532d">201 COMPLETADO + voucher (tu alias = cliente_id)</text>
+  <text x="820" y="340" font-size="14" fill="#64748b">Valida cliente · 422 si solo-PEN</text>
+
+  <line x1="480" y1="395" x2="480" y2="432" stroke="#16a34a" stroke-width="2.5" marker-end="url(#f1)"/>
+
+  <!-- Paso 3 -->
+  <circle cx="120" cy="510" r="30" fill="#f59e0b"/>
+  <text x="120" y="520" font-size="26" font-weight="800" fill="#1c1005" text-anchor="middle">3</text>
+  <rect x="170" y="455" width="620" height="110" rx="12" fill="#ffffff" stroke="#1e9e5a" stroke-width="2.5"/>
+  <text x="196" y="490" font-size="20" font-weight="700" fill="#0f5132">👛 Abonar a mi billetera</text>
+  <text x="196" y="516" font-size="14" fill="#14532d" font-family="Consolas, monospace">POST /wallets/:id/depositos { monto }</text>
+  <text x="196" y="540" font-size="14" fill="#14532d">Puente con tu acción · el saldo sube al instante</text>
+  <text x="820" y="510" font-size="14" fill="#64748b">Dominios separados (C11)</text>
+
+  <line x1="480" y1="565" x2="480" y2="602" stroke="#16a34a" stroke-width="2.5" marker-end="url(#f1)"/>
+
+  <!-- Paso 4 -->
+  <circle cx="120" cy="680" r="30" fill="#f59e0b"/>
+  <text x="120" y="690" font-size="26" font-weight="800" fill="#1c1005" text-anchor="middle">4</text>
+  <rect x="170" y="625" width="620" height="110" rx="12" fill="#ffffff" stroke="#1e9e5a" stroke-width="2.5"/>
+  <text x="196" y="660" font-size="20" font-weight="700" fill="#0f5132">🔀 Transferir por alias</text>
+  <text x="196" y="686" font-size="14" fill="#14532d" font-family="Consolas, monospace">buscar?q= + POST /transferencias { alias, monto }</text>
+  <text x="196" y="710" font-size="14" fill="#14532d">Atómica · replay seguro · 422 sin fondos</text>
+  <text x="820" y="680" font-size="14" fill="#64748b">Sin pegar UUIDs</text>
+
+  <line x1="480" y1="735" x2="480" y2="772" stroke="#16a34a" stroke-width="2.5" marker-end="url(#f1)"/>
+
+  <!-- Paso 5 -->
+  <circle cx="120" cy="850" r="30" fill="#f59e0b"/>
+  <text x="120" y="860" font-size="26" font-weight="800" fill="#1c1005" text-anchor="middle">5</text>
+  <rect x="170" y="795" width="620" height="110" rx="12" fill="#ffffff" stroke="#1e9e5a" stroke-width="2.5"/>
+  <text x="196" y="830" font-size="20" font-weight="700" fill="#0f5132">🧾 Historial propio</text>
+  <text x="196" y="856" font-size="14" fill="#14532d" font-family="Consolas, monospace">GET movimientos + depósitos de tu alias</text>
+  <text x="196" y="880" font-size="14" fill="#14532d">Saldo e historial solo tuyos · fin 🎉</text>
+  <text x="820" y="850" font-size="14" fill="#64748b">💱 FX solo referencial</text>
+
+  <!-- Banda lateral -->
+  <rect x="1020" y="115" width="240" height="790" rx="12" fill="#f2f5fa" stroke="#b9c6dd" stroke-width="2"/>
+  <text x="1044" y="151" font-size="18" font-weight="700" fill="#1a202c">Siempre USD</text>
+  <text x="1044" y="179" font-size="13" fill="#1a202c">• Montos "150.50"</text>
+  <text x="1044" y="201" font-size="13" fill="#1a202c">• NUMERIC(18,2)</text>
+  <text x="1044" y="223" font-size="13" fill="#1a202c">• Cero floats</text>
+  <text x="1044" y="245" font-size="13" fill="#1a202c">• CHECK moneda='USD'</text>
+  <text x="1044" y="273" font-size="13" fill="#1a202c">• X-Correlation-Id</text>
+  <text x="1044" y="301" font-size="13" fill="#1a202c">• Idempotency-Key</text>
+  <text x="1044" y="329" font-size="13" fill="#1a202c">• 422 sin fondos</text>
+  <text x="1044" y="357" font-size="13" fill="#1a202c">• Movs inmutables</text>
+</svg>

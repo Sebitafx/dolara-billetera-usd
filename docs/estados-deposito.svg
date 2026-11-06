@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="560" viewBox="0 0 1320 560" font-family="'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <marker id="e1" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#2b6cb0"/></marker>
+    <marker id="e2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#16a34a"/></marker>
+    <marker id="e3" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#dc2626"/></marker>
+  </defs>
+  <rect x="0" y="0" width="1320" height="560" fill="#ffffff"/>
+  <text x="60" y="56" font-size="26" font-weight="700" fill="#1a202c">Máquina de estados — Depósito USD <tspan font-size="15" font-weight="400" fill="#64748b">(RF-1 · domain/deposit.ts)</tspan></text>
+
+  <!-- PENDIENTE -->
+  <rect x="70" y="150" width="230" height="100" rx="48" fill="#fef3c7" stroke="#d97706" stroke-width="2.5"/>
+  <text x="185" y="190" font-size="20" font-weight="700" fill="#92400e" text-anchor="middle">PENDIENTE</text>
+  <text x="185" y="216" font-size="14" fill="#92400e" text-anchor="middle">INSERT inicial</text>
+
+  <!-- VALIDADO -->
+  <rect x="420" y="150" width="230" height="100" rx="48" fill="#dbeafe" stroke="#2b6cb0" stroke-width="2.5"/>
+  <text x="535" y="190" font-size="20" font-weight="700" fill="#1e3a8a" text-anchor="middle">VALIDADO</text>
+  <text x="535" y="216" font-size="14" fill="#1e3a8a" text-anchor="middle">cliente/cuenta USD OK</text>
+
+  <!-- COMPLETADO -->
+  <rect x="770" y="150" width="230" height="100" rx="48" fill="#dcfce7" stroke="#16a34a" stroke-width="2.5"/>
+  <text x="885" y="190" font-size="20" font-weight="700" fill="#065f46" text-anchor="middle">COMPLETADO</text>
+  <text x="885" y="216" font-size="14" fill="#065f46" text-anchor="middle">abono confirmado · 201</text>
+
+  <!-- FALLIDO -->
+  <rect x="420" y="360" width="230" height="100" rx="48" fill="#fee2e2" stroke="#dc2626" stroke-width="2.5"/>
+  <text x="535" y="400" font-size="20" font-weight="700" fill="#991b1b" text-anchor="middle">FALLIDO</text>
+  <text x="535" y="426" font-size="14" fill="#991b1b" text-anchor="middle">failure_code + motivo</text>
+
+  <!-- Flechas felices -->
+  <line x1="300" y1="200" x2="412" y2="200" stroke="#2b6cb0" stroke-width="2.5" marker-end="url(#e1)"/>
+  <text x="356" y="188" font-size="13" fill="#1e3a8a" text-anchor="middle">validación OK</text>
+  <line x1="650" y1="200" x2="762" y2="200" stroke="#16a34a" stroke-width="2.5" marker-end="url(#e2)"/>
+  <text x="706" y="188" font-size="13" fill="#065f46" text-anchor="middle">credit OK</text>
+
+  <!-- Caídas a FALLIDO -->
+  <path d="M185,250 V400 H412" fill="none" stroke="#dc2626" stroke-width="2.5" marker-end="url(#e3)"/>
+  <text x="120" y="340" font-size="13" fill="#991b1b">400/404/422 o 503</text>
+  <line x1="535" y1="250" x2="535" y2="352" stroke="#dc2626" stroke-width="2.5" marker-end="url(#e3)"/>
+  <text x="560" y="310" font-size="13" fill="#991b1b">abono falló → 503</text>
+
+  <!-- Reglas -->
+  <rect x="1030" y="150" width="240" height="310" rx="12" fill="#f2f5fa" stroke="#b9c6dd" stroke-width="2"/>
+  <text x="1054" y="186" font-size="18" font-weight="700" fill="#1a202c">Reglas</text>
+  <text x="1054" y="214" font-size="13" fill="#1a202c">• COMPLETADO solo con</text>
+  <text x="1054" y="234" font-size="13" fill="#1a202c">  abono confirmado</text>
+  <text x="1054" y="262" font-size="13" fill="#1a202c">• Terminales sin salida</text>
+  <text x="1054" y="290" font-size="13" fill="#1a202c">• Replay misma key no</text>
+  <text x="1054" y="310" font-size="13" fill="#1a202c">  re-abona (1 ledger)</text>
+  <text x="1054" y="338" font-size="13" fill="#1a202c">• Misma key + distinto</text>
+  <text x="1054" y="358" font-size="13" fill="#1a202c">  payload → 409</text>
+  <text x="1054" y="386" font-size="13" fill="#1a202c">• Billetera local usa</text>
+  <text x="1054" y="406" font-size="13" fill="#1a202c">  add/sub/gte (cero floats)</text>
+  <text x="1054" y="434" font-size="13" fill="#1a202c">• Dinero: "150.50"</text>
+</svg>

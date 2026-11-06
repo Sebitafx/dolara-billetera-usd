@@ -1,0 +1,72 @@
+{
+  "description": "Plantilla de configuración del Sandbox MCP de DOLARA para clientes de IA (Local y AWS)",
+  "configurations": {
+    "antigravity_and_cursor_aws_sandbox": {
+      "mcpServers": {
+        "dolara-billetera-usd-sandbox": {
+          "command": "node",
+          "args": [
+            "c:/Users/Josué/Documents/DESARROLLO DE APLICACIONES PARA LA NUBE/ms-billetera-usd/backend/dist/mcp/index.js",
+            "--transport",
+            "stdio"
+          ],
+          "env": {
+            "SANDBOX_API_BASE_URL": "http://54.167.69.62"
+          }
+        }
+      }
+    },
+    "antigravity_and_cursor_local": {
+      "mcpServers": {
+        "dolara-billetera-usd-sandbox": {
+          "command": "node",
+          "args": [
+            "c:/Users/Josué/Documents/DESARROLLO DE APLICACIONES PARA LA NUBE/ms-billetera-usd/backend/dist/mcp/index.js",
+            "--transport",
+            "stdio"
+          ],
+          "env": {
+            "SANDBOX_API_BASE_URL": "http://localhost:3001"
+          }
+        }
+      }
+    },
+    "antigravity_and_cursor_with_tsx": {
+      "mcpServers": {
+        "dolara-billetera-usd-sandbox": {
+          "command": "npx",
+          "args": [
+            "-y",
+            "tsx",
+            "c:/Users/Josué/Documents/DESARROLLO DE APLICACIONES PARA LA NUBE/ms-billetera-usd/backend/src/mcp/index.ts",
+            "--transport",
+            "stdio"
+          ],
+          "env": {
+            "SANDBOX_API_BASE_URL": "http://54.167.69.62"
+          }
+        }
+      }
+    },
+    "claude_desktop_aws": {
+      "mcpServers": {
+        "dolara-billetera-usd-sandbox": {
+          "command": "node",
+          "args": [
+            "c:/Users/Josué/Documents/DESARROLLO DE APLICACIONES PARA LA NUBE/ms-billetera-usd/backend/dist/mcp/index.js"
+          ],
+          "env": {
+            "SANDBOX_API_BASE_URL": "http://54.167.69.62"
+          }
+        }
+      }
+    },
+    "remote_sse_transport": {
+      "mcpServers": {
+        "dolara-billetera-usd-sandbox-remote": {
+          "url": "http://localhost:3005/sse"
+        }
+      }
+    }
+  }
+}

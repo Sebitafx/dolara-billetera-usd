@@ -25,10 +25,11 @@ Esta carpeta contiene la especificación de **DOLARA — billetera 100% en dóla
 7. **`07_CASOS_DE_USO_Y_MODELO_DATOS.md`**
    Casos de usuario formales (BDD Gherkin), diagrama ERD completo con restricciones, diagramas de estados/secuencia y estándares de ingeniería (precisión monetaria, idempotencia RFC, seguridad).
 
-8. **`spec.md` (v2), `plan.md`, `tasks.md`**
-   QUÉ/POR QUÉ, CÓMO y desglose verificable DOLARA USD-only con changelog v1→v2.
+8. **`spec.md` (v3), `plan.md`, `tasks.md`**
+   QUÉ/POR QUÉ, CÓMO y desglose verificable DOLARA USD-only con changelog v1→v2 y v2→v3.
 
-> **Nota Plan A:** `SDD_COMPLETO_MICROSERVICIO_DEPOSITOS_USD.md` es histórico v1 congelado (no editar, no usar para implementar). Fuente vigente: `spec.md v2 + 06_ARQUITECTURA_Y_FLUJOS.md + 07_CASOS_DE_USO_Y_MODELO_DATOS.md`.
+> **Nota Plan A:** `SDD_COMPLETO_MICROSERVICIO_DEPOSITOS_USD.md` es histórico v1 congelado (no editar, no usar para implementar). Fuente vigente: `spec.md v3 + plan.md v3 + 06_ARQUITECTURA_Y_FLUJOS.md + 07_CASOS_DE_USO_Y_MODELO_DATOS.md`.
+> **Nota v3:** `01–05` son el diseño base del equipo (v1, propone NestJS — implementado en Express según `plan.md §8`). Lo vigente es `spec/plan/tasks v3`.
 
 ## Orden recomendado de lectura
 
@@ -37,11 +38,11 @@ Esta carpeta contiene la especificación de **DOLARA — billetera 100% en dóla
   ↓
 07 Casos de Usuario y Modelo de Datos (ERD + Estándares)
   ↓
-spec.md v2 (qué)
+spec.md v3 (qué)
   ↓
 02 Contratos
   ↓
-plan.md + 01 SDD (cómo)
+plan.md v3 + 01 SDD base v1 (cómo)
   ↓
 04 Pruebas → 05 Integración
 ```

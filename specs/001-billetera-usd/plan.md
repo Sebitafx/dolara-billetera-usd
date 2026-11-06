@@ -1,7 +1,8 @@
-# PLAN 001 — Cómo se implementa Depósitos USD (Express + puertos/adaptadores)
+# PLAN 001 v3 — Cómo se implementa DOLARA (Express + puertos/adaptadores)
 
 > Lee primero `../constitution.md`, `spec.md` y los docs del equipo (`01`–`05`, `02` manda en contratos).
 > Stack: Node 24 + TypeScript estricto + **Express** (decisión del equipo: sin NestJS) + PostgreSQL 16 + vitest/supertest + Angular 18 + Docker.
+> v3: + acceso demo (§4.17–4.20), migración v3 y transferencia por alias. Fuente vigente con `spec.md v3`.
 
 ---
 
@@ -71,11 +72,15 @@ CREATE TABLE fake_ledger (
 );
 -- fx_rates igual que antes: (par PK, tasa NUMERIC(12,6), fuente, fetched_at)
 
--- Módulo billetera local (C11): tablas SEPARADAS del core, sin FKs cruzadas.
+-- Módulo billetera USD (C11): tablas SEPARADAS del core, sin FKs cruzadas.
+-- v1 crea base; v2 agrega moneda='USD' a wallets y movimientos; v3 agrega nombre+pin_hash.
 CREATE TABLE wallets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id TEXT NOT NULL UNIQUE,
+  nombre TEXT,                                -- v3: acceso demo
+  pin_hash TEXT,                              -- v3: SHA-256, nunca en claro
   balance NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (balance >= 0),
+  moneda CHAR(3) NOT NULL DEFAULT 'USD' CHECK (moneda = 'USD'),  -- v2
   creado_en TIMESTAMPTZ DEFAULT now()
 );
 CREATE TABLE billetera_movimientos (
@@ -83,6 +88,7 @@ CREATE TABLE billetera_movimientos (
   wallet_id UUID NOT NULL REFERENCES wallets(id),
   tipo TEXT NOT NULL CHECK (tipo IN ('deposito','retiro','transfer_in','transfer_out')),
   monto NUMERIC(18,2) NOT NULL CHECK (monto > 0),
+  moneda CHAR(3) NOT NULL DEFAULT 'USD' CHECK (moneda = 'USD'),  -- v2
   saldo_resultante NUMERIC(18,2) NOT NULL,
   referencia UUID,                            -- parea transfer_in/out
   idempotency_key TEXT UNIQUE,                -- solo transferencias
@@ -107,6 +113,16 @@ CREATE INDEX ON billetera_movimientos(wallet_id, creado_en DESC);
 - `POST /api/v1/billetera/wallets/:id/retiros { monto }` → `201`; sin fondos → `422 FONDOS_INSUFICIENTES` atómico.
 - `POST /api/v1/billetera/transferencias { origen_id, destino_id, monto }` + `Idempotency-Key` → `201 { referencia, origen_balance, destino_balance, replay:false }`; replay → mismo cuerpo `replay:true`; sin key → `400 SIN_IDEMPOTENCIA`; misma wallet → `400`; sin fondos → `422` atómico. Locks `FOR UPDATE` ordenados por id asc (anti-deadlock).
 - `GET /api/v1/billetera/wallets/:id/movimientos?page&limit` → `200 { items, page, limit, total }` desc, inmutable.
+
+## 4.17–4.20 Acceso demo + sesión por usuario (v3, RF-13, HU-0; sin auth real, S-8)
+
+- Migración v3 (`db.ts`): `wallets.nombre TEXT` + `wallets.pin_hash TEXT` (SHA-256, nunca en claro); `ALTER … IF NOT EXISTS` idempotente.
+- `POST /api/v1/billetera/registro { user_id, nombre, pin }` → `201 { id, user_id, nombre, balance:"0.00", moneda:"USD" }`; alias 3–30 `[a-z0-9_-]`, PIN 4–6 dígitos; duplicado → `409 YA_EXISTE`.
+- `POST /api/v1/billetera/login { user_id, pin }` → `200` sesión; PIN mal → `401 PIN_INCORRECTO`; inexistente → `404`; billetera legacy sin PIN lo fija en el primer login.
+- `GET /api/v1/billetera/usuarios/buscar?q=` (mín. 2 letras, máx. 8) → `[{ id, user_id, nombre }]` sin saldos ni hashes; `GET /wallets/by-user/:userId` para resolver alias.
+- Transferencias aceptan **UUID o alias** (`resolverWalletId` en `routes/billetera.ts`): el SPA transfiere por alias con autocompletado, sin pegar UUIDs.
+- Fakes aceptan wallets registradas: `FakeCustomerAccountAdapter` consulta `wallets` → todo `user_id` registrado es cliente USD activo; así cada usuario deposita con su alias como `cliente_id` y su historial es solo suyo. B/C reservados intactos.
+- SPA: `/acceso` (tabs login/registro) + `AuthService` (signal, clave `dolara_session` en localStorage) + `authGuard` (sin sesión → `/acceso`); resto de pantallas sin inputs de UUID/cliente. Desktop ≥960px sidebar + grid, móvil tabbar.
 
 ## 5. create-deposit use-case (01 §9.2 en Express)
 
