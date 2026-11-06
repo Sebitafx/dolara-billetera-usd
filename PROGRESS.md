@@ -27,4 +27,5 @@
 
 - **Causa identificada:** el commit con OpenAPI v1.2.0 estaba únicamente en `docs/actualizacion-specs`; el workflow solo observa `main`, no existía en la rama predeterminada y tampoco transfería el código del runner a EC2. Además, la instancia K3s no tiene Docker, por lo que no puede construir imágenes durante el despliegue remoto.
 - **Corrección:** CI valida pruebas, builds y OpenAPI; construye imágenes Linux/AMD64 etiquetadas con el SHA, transfiere código e imágenes, las importa en K3s, fija cada Deployment al SHA y verifica públicamente salud y versión OpenAPI.
-- **Siguiente paso:** publicar el pipeline corregido en `main`, ejecutar el despliegue y confirmar OpenAPI v1.2.0 en `http://54.167.69.62/docs/`.
+- **Completado:** release inmutable `b72586b` desplegado manualmente en EC2/K3s con SHA-256 de artefactos verificados. Backend, MCP y web quedaron disponibles con imágenes etiquetadas `b72586b`; PostgreSQL y su PVC permanecieron intactos. La verificación pública confirmó `/health/ready`, frontend y Swagger operativos; `/docs.json` reporta OpenAPI v1.2.0 aprobado y `/openapi.yaml` se descarga como `billetera-digital-usd-openapi.yaml`.
+- **Siguiente paso:** integrar la rama en `main` y sustituir el acceso SSH desde runners públicos por GitHub OIDC + AWS Systems Manager antes de habilitar despliegues automáticos sin intervención.
