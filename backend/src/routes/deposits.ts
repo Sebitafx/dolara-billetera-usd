@@ -38,21 +38,11 @@ deposits.post('/', async (req, res, next) => {
       return next(apiError(400, montoMal ? 'INVALID_AMOUNT' : 'VALIDATION_ERROR', 'payload inválido'));
     }
     const p = ports();
-    const lock = await pool.connect();
-    try {
-      await lock.query(`SELECT pg_advisory_lock(hashtextextended($1, 0))`, [`deposito:${key}`]);
-      const { deposito, replay } = await crearDeposito(
-        { ...parsed.data, idempotencyKey: key },
-        { customers: p.customers, balance: p.balance },
-      );
-      res.status(replay ? 200 : 201).json(deposito);
-    } finally {
-      try {
-        await lock.query(`SELECT pg_advisory_unlock(hashtextextended($1, 0))`, [`deposito:${key}`]);
-      } finally {
-        lock.release();
-      }
-    }
+    const { deposito, replay } = await crearDeposito(
+      { ...parsed.data, idempotencyKey: key },
+      { customers: p.customers, balance: p.balance },
+    );
+    res.status(replay ? 200 : 201).json(deposito);
   } catch (e) {
     if (e instanceof AppError) return next(apiError(e.status, e.code, e.message));
     next(e);

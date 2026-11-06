@@ -92,11 +92,34 @@ export async function crearDeposito(
 
   // 9-10. Persistir PENDIENTE -> VALIDADO.
   const id = randomUUID();
-  await pool.query(
-    `INSERT INTO depositos_usd (id, cliente_id, cuenta_destino_id, monto, moneda, metodo_origen, referencia_externa, idempotency_key, payload_hash, estado)
-     VALUES ($1,$2,$3,$4,'USD',$5,$6,$7,$8,'PENDIENTE')`,
-    [id, cmd.cliente_id, cmd.cuenta_destino_id ?? null, money.monto, cmd.metodo_origen, cmd.referencia_externa ?? null, cmd.idempotencyKey, payloadHash],
-  );
+  try {
+    await pool.query(
+      `INSERT INTO depositos_usd (id, cliente_id, cuenta_destino_id, monto, moneda, metodo_origen, referencia_externa, idempotency_key, payload_hash, estado)
+       VALUES ($1,$2,$3,$4,'USD',$5,$6,$7,$8,'PENDIENTE')`,
+      [id, cmd.cliente_id, cmd.cuenta_destino_id ?? null, money.monto, cmd.metodo_origen, cmd.referencia_externa ?? null, cmd.idempotencyKey, payloadHash],
+    );
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === '23505') {
+      // Carrera concurrente: otra petición insertó la misma idempotency_key en el mismo milisegundo.
+      for (let i = 0; i < 10; i++) {
+        const concurrent = await pool.query(`SELECT * FROM depositos_usd WHERE idempotency_key = $1`, [cmd.idempotencyKey]);
+        if (concurrent.rows.length > 0) {
+          if (concurrent.rows[0].payload_hash !== payloadHash) {
+            throw new AppError(409, 'IDEMPOTENCY_CONFLICT', 'misma clave con datos diferentes');
+          }
+          if (concurrent.rows[0].estado === 'COMPLETADO' || concurrent.rows[0].estado === 'FALLIDO') {
+            return { deposito: rowToDTO(concurrent.rows[0]), replay: true };
+          }
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      const finalCheck = await pool.query(`SELECT * FROM depositos_usd WHERE idempotency_key = $1`, [cmd.idempotencyKey]);
+      if (finalCheck.rows.length > 0) {
+        return { deposito: rowToDTO(finalCheck.rows[0]), replay: true };
+      }
+    }
+    throw err;
+  }
   await pool.query(`UPDATE depositos_usd SET estado='VALIDADO', actualizado_en=now() WHERE id=$1`, [id]);
 
   // 11. Solicitar abono con referencia idempotente = deposito_id.
