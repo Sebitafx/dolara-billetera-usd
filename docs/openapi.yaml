@@ -1023,7 +1023,16 @@ components:
       description: |
         `canal` identifica dónde se originó la solicitud; `metodo_origen` identifica
         el instrumento o rail de fondos. Son dimensiones independientes y ambas deben
-        conservarse para auditoría.
+        conservarse para auditoría. Durante la transición desde v1.1, el runtime admite
+        temporalmente solicitudes sin `canal`: infiere `VENTANILLA` para `EFECTIVO` y
+        `APP` para los demás métodos. Los clientes nuevos deben enviarlo siempre.
+      x-legacy-v1-compatibility:
+        missing-canal: accepted-temporarily
+        inference:
+          EFECTIVO: VENTANILLA
+          TRANSFERENCIA: APP
+          TARJETA: APP
+          OTRO: APP
       x-channel-method-policy:
         VENTANILLA: [EFECTIVO]
         AGENTE: [EFECTIVO]

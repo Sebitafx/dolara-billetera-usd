@@ -100,8 +100,38 @@ describe('api depositos-usd', () => {
     expect(r.status).toBe(201);
     expect(r.body.estado).toBe('COMPLETADO');
     expect(r.body.moneda).toBe('USD');
+    expect(r.body.canal).toBe('APP');
+    expect(r.body.metodo_origen).toBe('TRANSFERENCIA');
     expect(r.body.movimiento_saldo_id).toMatch(/^FAKE-/);
     depositoId = r.body.deposito_id;
+  });
+
+  it('v1.2 acepta canal, valida la combinación y mantiene compatibilidad v1.1', async () => {
+    const explicit = await request(app)
+      .post('/api/v1/depositos/usd')
+      .set('Idempotency-Key', randomUUID())
+      .send({ cliente_id: 'A', monto: '25.00', moneda: 'USD', canal: 'AGENTE', metodo_origen: 'EFECTIVO' });
+    expect(explicit.status).toBe(201);
+    expect(explicit.body).toMatchObject({ canal: 'AGENTE', metodo_origen: 'EFECTIVO', estado: 'COMPLETADO' });
+
+    const legacy = await request(app)
+      .post('/api/v1/depositos/usd')
+      .set('Idempotency-Key', randomUUID())
+      .send({ cliente_id: 'A', monto: '15.00', moneda: 'USD', metodo_origen: 'EFECTIVO' });
+    expect(legacy.status).toBe(201);
+    expect(legacy.body.canal).toBe('VENTANILLA');
+
+    for (const body of [
+      { cliente_id: 'A', monto: '5.00', moneda: 'USD', canal: 'APP', metodo_origen: 'EFECTIVO' },
+      { cliente_id: 'A', monto: '5.00', moneda: 'USD', canal: 'VENTANILLA', metodo_origen: 'TRANSFERENCIA' },
+    ]) {
+      const invalid = await request(app)
+        .post('/api/v1/depositos/usd')
+        .set('Idempotency-Key', randomUUID())
+        .send(body);
+      expect(invalid.status).toBe(400);
+      expect(invalid.body.code).toBe('INVALID_CHANNEL_METHOD');
+    }
   });
 
   it('E2E-02 replay misma key sin doble abono', async () => {

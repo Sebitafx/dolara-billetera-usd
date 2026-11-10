@@ -64,6 +64,7 @@ export class SandboxHttpClient {
       cliente_id: string;
       cuenta_destino_id?: string;
       monto: string;
+      canal?: 'VENTANILLA' | 'AGENTE' | 'APP';
       metodo_origen: string;
       referencia_externa?: string;
       moneda?: string;

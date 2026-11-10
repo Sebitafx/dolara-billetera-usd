@@ -16,6 +16,8 @@ export interface Deposito {
   cuenta_destino_id: string | null;
   monto: string;
   moneda: Currency;
+  canal: 'VENTANILLA' | 'AGENTE' | 'APP';
+  metodo_origen: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA' | 'OTRO';
   estado: DepositStatus;
   movimiento_saldo_id: string | null;
   creado_en: string;

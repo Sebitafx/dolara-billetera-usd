@@ -16,7 +16,7 @@ import { AuthService } from '../auth.service';
         <label>Monto USD <input [(ngModel)]="monto" name="monto" inputmode="decimal" placeholder="150.50" required /></label>
         <label>Método
           <select [(ngModel)]="metodo_origen" name="metodo">
-            <option>TRANSFERENCIA</option><option>EFECTIVO</option><option>TARJETA</option><option>OTRO</option>
+            <option>TRANSFERENCIA</option><option>TARJETA</option><option>OTRO</option>
           </select>
         </label>
         <button class="btn" type="submit" [disabled]="busy">{{ busy ? 'Procesando…' : 'Confirmar depósito USD' }}</button>

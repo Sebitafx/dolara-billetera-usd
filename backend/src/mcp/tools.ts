@@ -11,17 +11,19 @@ export function registerTools(server: McpServer, client: SandboxHttpClient) {
     {
       cliente_id: z.string().describe('ID o alias del cliente destinatario (ej. "cliente-activo", "demo-01" o "sandbox-user")'),
       monto: z.string().regex(/^\d+\.\d{2}$/, 'Formato monetario debe ser decimal con 2 posiciones, ej: "150.50"').describe('Monto a depositar en dólares (USD)'),
+      canal: z.enum(['VENTANILLA', 'AGENTE', 'APP']).optional().describe('Canal v1.2; si falta se infiere de forma compatible'),
       metodo_origen: z.enum(['TRANSFERENCIA', 'EFECTIVO', 'TARJETA', 'OTRO']).default('TRANSFERENCIA').describe('Método de abono'),
       cuenta_destino_id: z.string().optional().describe('ID de cuenta externa si aplica'),
       referencia_externa: z.string().optional().describe('Número de comprobante externo o voucher'),
       idempotency_key: z.string().optional().describe('Clave de idempotencia única. Si se omite, se genera un UUID v4 automático'),
     },
-    async ({ cliente_id, monto, metodo_origen, cuenta_destino_id, referencia_externa, idempotency_key }) => {
+    async ({ cliente_id, monto, canal, metodo_origen, cuenta_destino_id, referencia_externa, idempotency_key }) => {
       const key = idempotency_key || randomUUID();
       const res = await client.crearDeposito(
         {
           cliente_id,
           monto,
+          canal: canal ?? (metodo_origen === 'EFECTIVO' ? 'VENTANILLA' : 'APP'),
           metodo_origen,
           cuenta_destino_id,
           referencia_externa: referencia_externa ?? `SANDBOX-REF-${Date.now()}`,

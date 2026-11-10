@@ -13,6 +13,7 @@ const MIGRATIONS = [
      cuenta_destino_id TEXT,
      monto NUMERIC(18,2) NOT NULL CHECK (monto > 0),
      moneda CHAR(3) NOT NULL DEFAULT 'USD' CHECK (moneda = 'USD'),
+     canal TEXT NOT NULL CHECK (canal IN ('VENTANILLA','AGENTE','APP')),
      metodo_origen TEXT NOT NULL CHECK (metodo_origen IN ('EFECTIVO','TRANSFERENCIA','TARJETA','OTRO')),
      referencia_externa TEXT,
      idempotency_key TEXT NOT NULL UNIQUE,
@@ -82,6 +83,37 @@ const MIGRATIONS = [
   // v4: metadatos de vigencia entregados por el proveedor FX externo.
   `ALTER TABLE fx_rates ADD COLUMN IF NOT EXISTS provider_updated_at TIMESTAMPTZ;
    ALTER TABLE fx_rates ADD COLUMN IF NOT EXISTS next_update_at TIMESTAMPTZ;`,
+  // v5: alinea persistencia y runtime con el contrato v1.2 (canal + método).
+  `ALTER TABLE depositos_usd ADD COLUMN IF NOT EXISTS canal TEXT;
+   UPDATE depositos_usd
+      SET canal = CASE WHEN metodo_origen = 'EFECTIVO' THEN 'VENTANILLA' ELSE 'APP' END
+    WHERE canal IS NULL;
+   ALTER TABLE depositos_usd ALTER COLUMN canal DROP DEFAULT;
+   ALTER TABLE depositos_usd ALTER COLUMN canal SET NOT NULL;
+   CREATE OR REPLACE FUNCTION inferir_canal_deposito_legacy() RETURNS trigger AS $$
+   BEGIN
+     IF NEW.canal IS NULL THEN
+       NEW.canal := CASE WHEN NEW.metodo_origen = 'EFECTIVO' THEN 'VENTANILLA' ELSE 'APP' END;
+     END IF;
+     RETURN NEW;
+   END;
+   $$ LANGUAGE plpgsql;
+   DROP TRIGGER IF EXISTS trg_inferir_canal_deposito_legacy ON depositos_usd;
+   CREATE TRIGGER trg_inferir_canal_deposito_legacy
+     BEFORE INSERT ON depositos_usd
+     FOR EACH ROW EXECUTE FUNCTION inferir_canal_deposito_legacy();
+   DO $$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depositos_usd_canal_check') THEN
+       ALTER TABLE depositos_usd ADD CONSTRAINT depositos_usd_canal_check
+         CHECK (canal IN ('VENTANILLA','AGENTE','APP'));
+     END IF;
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depositos_usd_canal_metodo_check') THEN
+       ALTER TABLE depositos_usd ADD CONSTRAINT depositos_usd_canal_metodo_check CHECK (
+         ((canal IN ('VENTANILLA','AGENTE')) AND metodo_origen = 'EFECTIVO') OR
+         (canal = 'APP' AND metodo_origen IN ('TRANSFERENCIA','TARJETA','OTRO'))
+       );
+     END IF;
+   END $$;`,
 ];
 
 export async function migrate(): Promise<void> {

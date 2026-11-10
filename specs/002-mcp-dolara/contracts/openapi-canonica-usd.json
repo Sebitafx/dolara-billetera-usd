@@ -3,16 +3,49 @@
   "info": {
     "title": "Billetera Digital USD API",
     "version": "1.2.0",
-    "description": "Contrato REST de **Billetera Digital USD**.\nPermite crear depósitos, operar billeteras, transferir fondos y consultar tasas FX.\n\n### Convenciones\n- Todos los montos se representan como **strings decimales** (`\"150.50\"`) — sin floats.\n- Todas las billeteras operan exclusivamente en **USD**.\n- Los endpoints idempotentes requieren **`Idempotency-Key`** como UUID v4.\n- Toda respuesta incluye `X-Correlation-Id`; los errores usan siempre `ApiError`.\n- `GET /health/ready` conserva su respuesta operacional `ReadyResponse` incluso cuando devuelve 503.\n- Las conversiones USD/PEN son referenciales y usan una cotización externa de ExchangeRate-API.\n\n### Seguridad objetivo (propuesta para aprobación)\n- Usuarios web/móvil: OAuth 2.0 Authorization Code con PKCE, cliente público sin secreto.\n- Servicios y canales backend: OAuth 2.0 Client Credentials, un cliente confidencial por servicio.\n- Las APIs aceptan únicamente access tokens; deben validar firma, `iss`, `client_id`/`aud`,\n  `token_use=access`, `exp` y scopes. TLS es obligatorio fuera de loopback.\n- `/registro` y `/login` con PIN quedan temporalmente para la demo y se marcan como obsoletos;\n  no sustituyen la autenticación de producción.\n\n### Estado de implementación\nEsta versión documenta el **contrato objetivo para acuerdo entre equipos**. Los campos,\nrespuestas asíncronas y controles OAuth nuevos requieren implementación antes de promover\neste contrato a producción.\n",
+    "description": "Contrato REST de **Billetera Digital USD**.\nPermite crear depósitos, operar billeteras, transferir fondos y consultar tasas FX.\n\n### Convenciones\n- Todos los montos se representan como **strings decimales** (`\"150.50\"`) — sin floats.\n- Todas las billeteras operan exclusivamente en **USD**.\n- Los endpoints idempotentes requieren **`Idempotency-Key`** como UUID v4.\n- Toda respuesta incluye `X-Correlation-Id`; los errores usan siempre `ApiError`.\n- `GET /health/ready` conserva su respuesta operacional `ReadyResponse` incluso cuando devuelve 503.\n- Las conversiones USD/PEN son referenciales y usan una cotización externa de ExchangeRate-API.\n\n### Seguridad objetivo (propuesta para aprobación)\n- Usuarios web/móvil: OAuth 2.0 Authorization Code con PKCE, cliente público sin secreto.\n- Servicios y canales backend: OAuth 2.0 Client Credentials, un cliente confidencial por servicio.\n- Las APIs aceptan únicamente access tokens; deben validar firma, `iss`, `client_id`/`aud`,\n  `token_use=access`, `exp` y scopes. TLS es obligatorio fuera de loopback.\n- `/registro` y `/login` con PIN quedan temporalmente para la demo y se marcan como obsoletos;\n  no sustituyen la autenticación de producción.\n\n### Estado de implementación\nContrato funcional y técnico **aprobado por el propietario el 2026-11-06**. Los campos,\nrespuestas asíncronas y controles OAuth nuevos requieren implementación y pruebas antes\nde promover esta revisión a producción.\n\n### Límite funcional aprobado\nIncluye únicamente identidad necesaria para operar la billetera, saldo y ledger en USD,\ndepósitos USD, retiros USD, transferencias USD, historial, estado operativo de billeteras\ny equivalencia referencial USD/PEN. Esta API nunca acredita ni mantiene PEN; la billetera\nde soles conserva la propiedad exclusiva de su saldo y ledger PEN.\n\nQuedan fuera de alcance: saldos multimoneda, cambio con liquidación, compraventa de divisas,\ncriptoactivos, préstamos, inversiones, emisión/procesamiento de tarjetas, remesas y funciones\nbancarias que no sean necesarias para esta billetera digital en dólares.\n",
     "license": {
       "name": "Uso interno — confirmar licencia antes de distribución externa"
     },
     "x-api-version": "v1",
     "x-currency": "USD-only",
     "x-fx-provider": "https://www.exchangerate-api.com",
-    "x-contract-status": "proposed-for-team-review",
-    "x-implementation-status": "not-yet-enforced",
-    "x-breaking-change": true
+    "x-contract-status": "approved",
+    "x-approved-on": "2026-11-06",
+    "x-approved-by": "product-owner",
+    "x-implementation-status": "approved-pending-implementation",
+    "x-breaking-change": true,
+    "x-ledger-currency": "USD",
+    "x-pen-usage": "reference-only",
+    "x-bounded-context": "wallet-usd"
+  },
+  "x-wallet-integration-boundary": {
+    "usd_owner": "Billetera Digital USD",
+    "pen_owner": "Billetera Digital PEN",
+    "invariants": [
+      "Cada billetera escribe únicamente su propio ledger y moneda.",
+      "Toda orden, movimiento y evento declara `moneda` y el contexto emisor.",
+      "Esta API rechaza cualquier operación monetaria PEN; PEN solo aparece en respuestas FX referenciales.",
+      "La unión de proyectos no fusiona saldos ni movimientos por `user_id`; la identidad puede compartirse, los ledgers no.",
+      "Una conversión con liquidación futura requiere un contrato y una orquestación separados; no se infiere de `/fx/convertir`."
+    ]
+  },
+  "x-functional-scope": {
+    "included": [
+      "identidad mínima para operar la billetera",
+      "saldo y movimientos exclusivamente USD",
+      "depósitos, retiros y transferencias USD",
+      "historial y estados operativos de billetera",
+      "conversión USD/PEN exclusivamente referencial",
+      "interoperabilidad segura con la billetera PEN mediante fronteras de moneda explícitas"
+    ],
+    "excluded": [
+      "saldos o ledger multimoneda",
+      "liquidación o compraventa de divisas",
+      "criptoactivos, préstamos e inversiones",
+      "emisión o procesamiento de tarjetas",
+      "remesas y productos bancarios ajenos a la billetera USD"
+    ]
   },
   "servers": [
     {
@@ -40,6 +73,29 @@
     "token_cache": "Reutilizar el access token hasta 60 segundos antes de expirar; no solicitar uno por operación.",
     "secret_storage": "AWS Secrets Manager; nunca variables versionadas ni secretos en imágenes."
   },
+  "x-jwt-validation": {
+    "accepted_token_use": "access",
+    "required_claims": [
+      "iss",
+      "exp",
+      "iat",
+      "token_use",
+      "client_id",
+      "scope"
+    ],
+    "allowed_clock_skew_seconds": 60,
+    "jwks": "Cachear claves y refrescar al encontrar un `kid` desconocido; nunca desactivar la validación de firma.",
+    "audience_policy": "Permitir únicamente app client IDs configurados por ambiente.",
+    "resource_authorization": "Validar propiedad de la billetera además del scope; un scope por sí solo no concede acceso a recursos ajenos."
+  },
+  "x-quality-gates": {
+    "contract": "OpenAPI válido, sin referencias rotas y con pruebas de compatibilidad de consumidores.",
+    "tests": "Unitarias, integración PostgreSQL, contrato, E2E, concurrencia, idempotencia y seguridad.",
+    "security": "Sin vulnerabilidades críticas/altas no aceptadas; secretos y tokens ausentes de código, imágenes y logs.",
+    "data": "Migraciones compatibles, respaldo previo, rollback documentado y restauración probada.",
+    "delivery": "Despliegue progresivo, probes saludables y rollback automático ante regresión.",
+    "observability": "Correlation ID, auditoría, métricas, logs estructurados y alertas de operaciones VALIDADO envejecidas."
+  },
   "tags": [
     {
       "name": "Depósitos USD",
@@ -59,7 +115,7 @@
     },
     {
       "name": "Sandbox",
-      "description": "Escenarios de integración y limpieza de datos de prueba; requiere SANDBOX_MODE=true fuera de producción para reiniciar."
+      "description": "Mecanismo interno de calidad; no forma parte del negocio y debe estar deshabilitado en producción."
     }
   ],
   "paths": {
@@ -78,6 +134,7 @@
           }
         ],
         "x-production-disabled": true,
+        "x-api-surface": "internal-quality-only",
         "responses": {
           "200": {
             "description": "Estado del sandbox y escenarios disponibles."
@@ -87,6 +144,9 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -106,12 +166,19 @@
           }
         ],
         "x-production-disabled": true,
+        "x-api-surface": "internal-quality-only",
         "responses": {
           "200": {
             "description": "Datos de prueba eliminados."
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "403": {
             "description": "Sandbox deshabilitado o entorno de producción."
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -382,6 +449,15 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -429,8 +505,17 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -481,6 +566,9 @@
           },
           "409": {
             "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -533,6 +621,9 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -588,6 +679,15 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -645,8 +745,17 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "409": {
             "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -703,8 +812,17 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -760,8 +878,17 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -823,11 +950,20 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           },
           "422": {
             "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -889,11 +1025,20 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           },
           "422": {
             "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -948,8 +1093,17 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -1023,6 +1177,12 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           },
@@ -1031,6 +1191,9 @@
           },
           "422": {
             "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -1102,6 +1265,15 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
           }
@@ -1172,6 +1344,15 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           },
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
@@ -1306,7 +1487,16 @@
           "canal",
           "metodo_origen"
         ],
-        "description": "`canal` identifica dónde se originó la solicitud; `metodo_origen` identifica\nel instrumento o rail de fondos. Son dimensiones independientes y ambas deben\nconservarse para auditoría.\n",
+        "description": "`canal` identifica dónde se originó la solicitud; `metodo_origen` identifica\nel instrumento o rail de fondos. Son dimensiones independientes y ambas deben\nconservarse para auditoría. Durante la transición desde v1.1, el runtime admite\ntemporalmente solicitudes sin `canal`: infiere `VENTANILLA` para `EFECTIVO` y\n`APP` para los demás métodos. Los clientes nuevos deben enviarlo siempre.\n",
+        "x-legacy-v1-compatibility": {
+          "missing-canal": "accepted-temporarily",
+          "inference": {
+            "EFECTIVO": "VENTANILLA",
+            "TRANSFERENCIA": "APP",
+            "TARJETA": "APP",
+            "OTRO": "APP"
+          }
+        },
         "x-channel-method-policy": {
           "VENTANILLA": [
             "EFECTIVO"
@@ -2126,6 +2316,22 @@
             "type": "string",
             "format": "date-time",
             "example": "2026-10-30T20:00:00.000Z"
+          },
+          "retryable": {
+            "type": "boolean",
+            "description": "Indica si el cliente puede reintentar respetando idempotencia y `Retry-After`.",
+            "example": false
+          },
+          "resource_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Identificador de la operación persistida cuando el resultado externo es ambiguo."
+          },
+          "resource_url": {
+            "type": "string",
+            "format": "uri-reference",
+            "nullable": true,
+            "description": "URL para consultar el estado definitivo de una operación persistida."
           }
         }
       }
@@ -2150,6 +2356,15 @@
       },
       "Unauthorized": {
         "description": "Access token ausente, inválido, expirado o de tipo incorrecto.",
+        "headers": {
+          "WWW-Authenticate": {
+            "description": "Desafío Bearer conforme a OAuth 2.0.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "Bearer realm=\"billetera-usd\", error=\"invalid_token\""
+          }
+        },
         "content": {
           "application/json": {
             "schema": {
@@ -2184,6 +2399,15 @@
       },
       "Forbidden": {
         "description": "Token válido, pero sin el scope requerido o sin acceso al recurso solicitado.",
+        "headers": {
+          "WWW-Authenticate": {
+            "description": "Scope requerido cuando el rechazo se debe a autorización insuficiente.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "Bearer error=\"insufficient_scope\", scope=\"billetera/wallets.read\""
+          }
+        },
         "content": {
           "application/json": {
             "schema": {
@@ -2306,7 +2530,10 @@
               "code": "BALANCE_UNEXPECTED_STATE",
               "message": "Saldos devolvió un estado no reconocido",
               "correlation_id": "550e8400-e29b-41d4-a716-446655440009",
-              "timestamp": "2026-11-06T15:00:00.000Z"
+              "timestamp": "2026-11-06T15:00:00.000Z",
+              "retryable": true,
+              "resource_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+              "resource_url": "/api/v1/depositos/usd/3fa85f64-5717-4562-b3fc-2c963f66afa6"
             }
           }
         }

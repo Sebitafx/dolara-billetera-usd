@@ -29,3 +29,10 @@
 - **Corrección:** CI valida pruebas, builds y OpenAPI; construye imágenes Linux/AMD64 etiquetadas con el SHA, transfiere código e imágenes, las importa en K3s, fija cada Deployment al SHA y verifica públicamente salud y versión OpenAPI.
 - **Completado:** release inmutable `b72586b` desplegado manualmente en EC2/K3s con SHA-256 de artefactos verificados. Backend, MCP y web quedaron disponibles con imágenes etiquetadas `b72586b`; PostgreSQL y su PVC permanecieron intactos. La verificación pública confirmó `/health/ready`, frontend y Swagger operativos; `/docs.json` reporta OpenAPI v1.2.0 aprobado y `/openapi.yaml` se descarga como `billetera-digital-usd-openapi.yaml`.
 - **Siguiente paso:** integrar la rama en `main` y sustituir el acceso SSH desde runners públicos por GitHub OIDC + AWS Systems Manager antes de habilitar despliegues automáticos sin intervención.
+
+## Hotfix contrato `canal` v1.2 (2026-11-10)
+
+- **Causa:** OpenAPI v1.2 exigía `canal`, pero el runtime desplegado conservaba el esquema estricto v1.1 y rechazaba el campo como desconocido.
+- **Corrección:** el backend valida y persiste `canal`, aplica la matriz canal/método, lo devuelve en las respuestas y conserva idempotencia con registros anteriores. La compatibilidad temporal infiere `VENTANILLA` para `EFECTIVO` y `APP` para los demás métodos cuando un cliente v1.1 omite `canal`.
+- **Verificación:** 52/52 pruebas backend, compilación TypeScript y validación Redocly aprobadas; se añadieron casos explícitos v1.2, legado v1.1 y combinaciones inválidas.
+- **Siguiente paso:** desplegar el hotfix y confirmar contra la URL pública ambos formatos de solicitud.

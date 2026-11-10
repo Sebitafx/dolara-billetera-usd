@@ -21,7 +21,7 @@ export class ApiService {
   // ---- Depósitos USD (recarga a saldo externo / voucher) ----
   depositar(cmd: { cliente_id: string; monto: string; metodo_origen: string; referencia_externa?: string }) {
     const headers = new HttpHeaders({ 'Idempotency-Key': crypto.randomUUID() });
-    return this.http.post<Deposito>(`${this.base}/depositos/usd`, { ...cmd, moneda: 'USD' }, { headers });
+    return this.http.post<Deposito>(`${this.base}/depositos/usd`, { ...cmd, moneda: 'USD', canal: 'APP' }, { headers });
   }
 
   consultar(id: string) {

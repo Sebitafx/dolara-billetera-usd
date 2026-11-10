@@ -35,6 +35,8 @@ deposits.post('/', async (req, res, next) => {
       const monedaMal = parsed.error.issues.some((i) => String(i.path[0] ?? '') === 'moneda');
       if (monedaMal) return next(apiError(400, 'VALIDATION_ERROR', 'billetera USD-only: moneda debe ser USD'));
       const montoMal = parsed.error.issues.some((i) => String(i.path[0] ?? '') === 'monto');
+      const canalMal = parsed.error.issues.some((i) => String(i.path[0] ?? '') === 'canal');
+      if (canalMal) return next(apiError(400, 'INVALID_CHANNEL_METHOD', 'combinación canal/metodo_origen no permitida'));
       return next(apiError(400, montoMal ? 'INVALID_AMOUNT' : 'VALIDATION_ERROR', 'payload inválido'));
     }
     const p = ports();
@@ -77,6 +79,8 @@ deposits.get('/:id', async (req, res, next) => {
       cuenta_destino_id: r.cuenta_destino_id,
       monto: String(r.monto),
       moneda: 'USD',
+      canal: r.canal,
+      metodo_origen: r.metodo_origen,
       estado: r.estado,
       movimiento_saldo_id: r.movimiento_saldo_id,
       creado_en: new Date(r.creado_en).toISOString(),
